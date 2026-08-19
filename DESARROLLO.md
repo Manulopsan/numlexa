@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F0.06
+F0.07
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -22,7 +22,7 @@ F0.06
 - [x] **F0.03** — **Decidir el alcance de iOS.** Letrixa es solo Android y no tiene carpeta `ios/`. Si iOS entra, entra desde F5, no al final. → *Decisión registrada; `F11.05` ajustada en consecuencia.* `DESARROLLO.md`
 - [x] **F0.04** — Inicializar monorepo con Melos: `packages/` Dart puros + `apps/mobile` + `supabase/`. → *`melos bootstrap` resuelve sin error.* `pubspec.yaml` *(no `melos.yaml`: ver `D-16`)*
 - [x] **F0.05** — `analysis_options.yaml` estricto: `strict-casts`, `strict-inference`, sin `print()`, warnings **bloqueantes**. Letrixa usa `flutter_lints` por defecto con warnings no bloqueantes; aquí no. → *Falla ante una violación de prueba.* `analysis_options.yaml`
-- [ ] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
+- [x] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [ ] **F0.07** — Script `melos run verify` = analyze + format + test. → *Un solo comando devuelve 0 con el repo limpio.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [ ] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
 - [ ] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
@@ -316,6 +316,12 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F0.06** — `melos run test` reporta cobertura por paquete y aplica el umbral del 90%. Tres pasos encadenados con `steps:`: `dart test --coverage` en cada paquete, `format_coverage` a lcov, y `scripts/check_coverage.dart`, que suma los registros `DA:` de cada `lcov.info` e imprime una tabla por paquete. Añadidos `test` y `coverage` como dev-dependencies de los tres paquetes y un test de andamio en cada uno, marcado como tal, para que `dart test` no falle por ausencia de ficheros; se sustituye por los tests reales de reglas en F1.02, F2.02 y F3.02, que por `CLAUDE.md §7` van antes que la implementación.
+**Criterio verificado en las tres direcciones, no solo en verde:** con código deliberadamente mal cubierto, `25.0% (2/8) FALLA` y `melos run test` termina en **rc=1**; cubriéndolo entero, `100.0% (8/8) OK` y **rc=0**; y borrando un `lcov.info`, `SIN INFORME DE COBERTURA FALLA` con rc=1. Ese tercer caso es deliberado: un paquete cuyos tests no llegaron a correr no puede pasar por silencio, que es el dolor #2 con otra ropa.
+**Tropiezo:** los `steps:` de Melos se ejecutan en la shell del sistema, y `melos` no está en el `PATH` porque lo invocamos con `dart run melos`. Los pasos que llamaban a `melos exec` reventaban con «no se reconoce como un comando». Resueltos como `dart run melos exec …`, que además deja el pipeline **autocontenido**: no exige activar Melos globalmente en ninguna máquina, lo que importa para el CI de `F0.08`.
+**El script no usa `print()`**, sino `stdout.writeln`: `avoid_print` es error desde F0.05, y la primera víctima de una regla nueva suele ser el propio tooling.
+**Agujero conocido, anotado en `BACKLOG`:** hoy los tres paquetes reportan «sin líneas ejecutables todavía» y eso cuenta como pase. Es correcto ahora —no hay código— pero significa que un fallo de instrumentación pasaría desapercibido hasta que haya código real.
+
 **2026-08-19 · F0.05** — `analysis_options.yaml` estricto en la raíz, aplicando a todo el monorepo. `strict-casts`, `strict-inference` y además `strict-raw-types`, que es la tercera vía por la que `dynamic` se cuela sin que nadie lo escriba. Sobre `lints/recommended`, una lista corta y deliberada de reglas extra, y **quince diagnósticos elevados a `error`** en `analyzer.errors` para que tumben el build por sí solos, sin depender de que alguien recuerde pasar `--fatal-infos`. `todo: ignore`: lo que bloquea es el `BACKLOG`, no un comentario.
 **Criterio verificado de verdad, no por inspección:** escribí un fichero con violaciones deliberadas y `dart analyze` devolvió **rc=3** con 8 incidencias; borrado el fichero, vuelve a rc=0. Comprobadas una por una, en tres tandas, todas las reglas escaladas: `always_declare_return_types`, `invalid_assignment` por strict-casts, `strict_raw_type`, `inference_failure`, `avoid_dynamic_calls`, `unused_local_variable`, `avoid_print`, `unrelated_type_equality_checks`, `literal_only_boolean_expressions`, `unawaited_futures` y `dead_code`.
 **Sorpresa, y de la misma familia silenciosa que la de F0.04:** `avoid_print` **no saltaba**. Escalar una regla en `analyzer.errors` **no la activa**; si no está en `linter.rules` ni viene de `lints/recommended`, la severidad se ignora sin decir nada. O sea que la prohibición de `print()` de `CLAUDE.md §7` estaba escrita en el fichero y no se aplicaba. Solo se vio porque la prueba de violación la buscaba explícitamente. Añadida a `linter.rules` con un comentario que explica la trampa, y auditado el resto de la lista de `errors:` en vez de darla por buena.
@@ -342,6 +348,7 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 - **`spanish_words.json` aportado en la raíz** (131.655 entradas, lista plana sin frecuencias). Inspección rápida: contiene **nombres propios** (`abraham`, `alemania`, `afganistan`, `alcalá`) y **siglas** (`abs`, `adn`, `adsl`), justo lo que `F2.04` debe filtrar. Además, al no traer rangos de frecuencia, `F2.05` necesitará una lista externa. Moverlo a `data/raw/` en `F2.01`, no antes.
 - **`icon.webp` en la raíz.** Colocarlo en `apps/mobile` cuando exista (`F5.01`/`F5.02`), generar densidades y adaptive icon. No tocar hasta entonces.
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
+- **Cerrar el agujero de «sin líneas ejecutables» en `scripts/check_coverage.dart`.** Hoy un paquete sin líneas medibles pasa, que es lo correcto mientras `packages/` esté vacío. En cuanto `F1.01` y `F3.01` metan código real, ese caso debe convertirse en **FALLA**: si no, un fallo de instrumentación de cobertura dejaría el umbral del 90% en verde sin medir nada.
 - **`CLAUDE.md §7` prohíbe `// ignore:` sin justificar, y no existe lint que lo compruebe.** Se cubre en `F0.07` con un `grep` dentro de `verify` que falle ante un `// ignore:` sin comentario de justificación en la línea anterior. Anotado aquí para que no se pierda entre F0.05 y F0.07.
 - **Credenciales:** la clave `anon` de Supabase es pública por diseño y puede viajar en el `run.ps1` y en el binario. La `service_role` **no entra jamás** en el repo, ni en el script, ni en un `--dart-define`; su sitio son los secretos de GitHub Actions (`F0.09`).
 

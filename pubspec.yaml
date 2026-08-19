@@ -27,3 +27,14 @@ melos:
       # Melos genera ficheros de IntelliJ por defecto. No se versionan y no
       # todo el mundo usa ese IDE: se desactivan en vez de ignorarlos.
       enabled: false
+
+  scripts:
+    test:
+      description: >
+        Ejecuta los tests de todos los paquetes con cobertura y comprueba el
+        umbral del 90% que exige CLAUDE.md §7. Falla si algun paquete baja del
+        umbral o si alguno no llega a producir informe.
+      steps:
+        - dart run melos exec --order-dependents -- dart test --coverage=coverage
+        - dart run melos exec -- dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib
+        - dart run scripts/check_coverage.dart
