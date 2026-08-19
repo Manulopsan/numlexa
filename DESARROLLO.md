@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F1.02
+F1.03
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -37,7 +37,7 @@ F1.02
 > Net-new. Letrixa no tiene nada numérico. Bloquea niveles, bot y reto diario.
 
 - [x] **F1.01** — Tipos en `numlexa_numbers`: `Tile`, `TileSet`, `Target`, `Expression`, `Solution`, `PuzzleMeta`. → *Sin estados imposibles representables.* `packages/numlexa_numbers/lib/src/types.dart`
-- [ ] **F1.02** — `evaluate(expr)`, que devuelve `null` si algún paso intermedio no es entero positivo o si hay división inexacta. → *`100/3` → null · `3-5` → null · `(75+25)*7` → 700.* `packages/numlexa_numbers/lib/src/evaluate.dart`
+- [x] **F1.02** — `evaluate(expr)`, que devuelve `null` si algún paso intermedio no es entero positivo o si hay división inexacta. → *`100/3` → null · `3-5` → null · `(75+25)*7` → 700.* `packages/numlexa_numbers/lib/src/evaluate.dart`
 - [ ] **F1.03** — Enumerar los multiconjuntos válidos de 6 fichas (0–4 grandes). → *La cuenta coincide con el cálculo combinatorio hecho a mano y documentado en la bitácora.* `packages/numlexa_numbers/lib/src/enumerate.dart`
 - [ ] **F1.04** — DP sobre subconjuntos: `reachable(tiles)` recorriendo particiones `S = A ⊎ B`. → *Para `[25,50,75,100,3,6]` contiene 952 y no contiene 1000000.* `packages/numlexa_numbers/lib/src/dp.dart`
 - [ ] **F1.05** — Bitmap de alcanzabilidad: 899 bits por multiconjunto. → *Popcount plausible y estable entre ejecuciones.* `packages/numlexa_numbers/lib/src/bitmap.dart`
@@ -329,6 +329,16 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F1.02 — CERRADA** — `evaluate(expression, tiles)` implementado con los tests escritos antes. Los tres casos del criterio pasan: `100/3` → `null`, `3-5` → `null`, `(75+25)*7` → **700**. 52 tests en el paquete, **100% de cobertura (154/154)**.
+**`null` no es un error, es una respuesta.** Está escrito en el propio fichero: el servidor recibe jugadas de clientes y muchas serán inválidas, así que «esta expresión no es una jugada válida» tiene que ser un valor de retorno normal y no una excepción (`CLAUDE.md §6`, régimen B). Es la contrapartida de la excepción deliberada de F1.01, donde `Expression` sí puede representar lo inválido.
+**Lo que el evaluador NO comprueba, y por qué:** que cada ficha se use como máximo una vez. No es un olvido — es que en F1.01 quedó **irrepresentable en el tipo**, así que comprobarlo aquí sería código muerto. La regla se cumple por construcción, no por validación.
+**Detalles que los tests forzaron a decidir:**
+- **El cero no vale.** `5 - 5` devuelve `null`, no `0`. La regla dice *estrictamente* positivo, y es fácil escribir `a >= b` por descuido. Hay un test dedicado con las dos fichas de valor 5 del mismo tablero.
+- **La división por cero es inalcanzable por construcción** —todo intermedio válido es > 0— pero la comprobación se deja puesta, y comentada como defensiva. Sin ella, un cambio futuro la convertiría en una división por cero silenciosa. El test correspondiente comprueba que la rama que *produciría* el cero ya devuelve `null` antes de llegar ahí.
+- **El fallo se propaga hacia arriba** desde cualquier profundidad, y hay un test por cada rama, izquierda y derecha, para que no se cuele una evaluación que ignore uno de los dos lados.
+- **`trySolution` es la única puerta a `Solution`.** Cierra el argumento de tipos de F1.01: la garantía solo la puede emitir quien ha evaluado.
+**Lo que NO he creado a propósito:** `conformance/evaluate.json`. `D-08` dice que los vectores dorados los **generan los `tools/`**, y no existe ningún generador todavía. Escribirlos a mano ahora los convertiría en una copia manual de la implementación Dart, que es exactamente la clase de sincronización frágil que la conformidad viene a matar. Anotado en `BACKLOG` con el problema técnico que arrastra.
+
 **2026-08-19 · F1.01 — CERRADA** — Los seis tipos del motor de cifras, con los tests escritos **antes** que la implementación (`CLAUDE.md §7`): 36 tests, y los vi fallar por «loading» antes de que existiera `types.dart`.
 **Qué queda irrepresentable:** una ficha que no sea 1–10 o {25,50,75,100}; un tablero que no tenga exactamente seis fichas o que repita una grande, o una pequeña tres veces; un objetivo fuera de `[101,999]`; una hoja que apunte fuera del tablero; **una expresión que use dos veces la misma ficha**; una solución con valor ≤ 0; y unas métricas con cero soluciones o con un número de operaciones que seis fichas no permiten.
 **La excepción es deliberada y está escrita en el propio código:** `Expression` **sí** puede representar `3 - 5` o `100 / 3`. El servidor recibe expresiones de los clientes y tiene que poder **representarlas para rechazarlas** (`CLAUDE.md §6`, régimen B). Si fueran irrepresentables, la validación se colaría dentro del parseo, que es mucho más difícil de probar. Esa es exactamente la frontera que separa `Expression` de `Solution`: la primera es sintaxis, la segunda es una garantía, y solo el evaluador de F1.02 puede producirla.
@@ -431,6 +441,7 @@ La cuarta fila es la que cierra el argumento: el JSON es la autoridad, y cambiar
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
 - **`F0.11` debe incluir `* text=auto eol=lf` en `.gitattributes`, no solo las reglas de LFS.** Ya ha pasado una vez: un editor de Windows reescribió `spanish_words.json` en CRLF y git marcó las 131.656 líneas como modificadas sin que cambiara una sola palabra. Se restauró sin pérdida, pero si le ocurre a un `.dart` la puerta `format` del CI falla en Linux por algo que en local se ve perfecto — el peor tipo de fallo, el que no se reproduce en la máquina de quien lo causó.
 - **`icon.webp` y `spanish_words.json` entraron en el historial de git** en el commit `91f02ab` («first upload»), en la raíz y **sin LFS** (1,8 MB el diccionario). No es grave y no se reescribe historia ya empujada, pero: cuando `F2.01` mueva el diccionario a `data/raw/` —que va ignorado— hay que **dejar de versionar la copia de la raíz**, y `F0.11` debe cubrir `data/dist/` con LFS antes de que aparezca el primer binario generado, que sí será grande.
+- **`conformance/evaluate.json` y el cargador compartido.** Los vectores del evaluador deben **generarse** desde un `tools/`, no escribirse a mano (`D-08`). Y hay un problema técnico pendiente: el cargador de vectores vive en `packages/numlexa_core/test/conformance/`, y los tests de `numlexa_numbers` no pueden importar el `test/` de otro paquete. Antes de `F1.14` hay que decidir dónde vive el cargador —paquete de desarrollo propio, o `lib/` de `numlexa_core`— en vez de copiarlo, que es como se pudren estas cosas.
 - **Hace falta un renderizador de expresiones para el usuario.** `Expression.toString()` produce `((TileLeaf(0) + TileLeaf(1)) * TileLeaf(2))`, que sirve para depurar pero no para enseñar. Mostrar `((100 + 75) * 4)` exige el `TileSet`, porque las hojas son posiciones, no valores. Corresponde a `F1.06` (solver) o `F5.08` (pantalla de resultado), no a los tipos.
 - **Vigilar la cuota de LFS de GitHub.** El plan gratuito da 1 GB de almacenamiento y 1 GB/mes de ancho de banda por cuenta, y en un repositorio **público** el ancho de banda que consumen los clones lo paga el propietario. Los artefactos previstos son de pocos MB, pero **cada regeneración añade una versión nueva** al almacenamiento de LFS. Revisar el consumo cuando `F1.08` empiece a producir bitmaps de verdad.
 - **Instalar Deno en la máquina de desarrollo y meter `conformance` dentro de `verify` local.** Hoy `melos run verify` solo cubre la mitad Dart; la mitad TypeScript se verifica en el CI, que es bloqueante, y con `melos run conformance` a mano. Deno hará falta igualmente en `F1.14`. Valorar entonces añadir también `deno fmt --check`, que hoy se deja fuera para no exigir Deno en local.
