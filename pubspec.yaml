@@ -38,3 +38,33 @@ melos:
         - dart run melos exec --order-dependents -- dart test --coverage=coverage
         - dart run melos exec -- dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib
         - dart run scripts/check_coverage.dart
+
+    format:
+      description: >
+        Comprueba el formato sin reescribir nada. Falla si algun fichero no
+        esta formateado; para arreglarlo, `dart format .`.
+      run: dart format --output=none --set-exit-if-changed .
+
+    analyze:
+      description: >
+        Analisis estatico de todo el monorepo con las reglas de
+        analysis_options.yaml. `--fatal-infos` y `--fatal-warnings` hacen
+        bloqueante TODO, no solo lo que F0.05 elevo a `error`.
+      run: dart analyze --fatal-infos --fatal-warnings .
+
+    ignores:
+      description: >
+        Falla ante cualquier `// ignore:` sin comentario de justificacion
+        encima. CLAUDE.md §7 lo prohibe y no hay lint que lo compruebe.
+      run: dart run scripts/check_ignores.dart
+
+    verify:
+      description: >
+        La puerta de entrada a cada commit (CLAUDE.md §2, paso 5):
+        format + analyze + ignores + test con umbral de cobertura.
+        Debe devolver 0 con el repositorio limpio.
+      steps:
+        - format
+        - analyze
+        - ignores
+        - test
