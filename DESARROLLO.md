@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F0.03
+F0.04
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -19,7 +19,7 @@ F0.03
 
 - [x] **F0.01** — Auditar Letrixa. → *Hecha. Resultados en `INVENTARIO LETRIXA` y en `D-07`…`D-11`.*
 - [x] **F0.02** — **Decidir el tier de Supabase con `pg_cron` disponible** antes de escribir una sola tarea programada. → *Decisión registrada con el coste mensual. Si no hay pg_cron, se asume conscientemente el patrón de GitHub Actions cron y se documenta por qué.* `DESARROLLO.md`
-- [ ] **F0.03** — **Decidir el alcance de iOS.** Letrixa es solo Android y no tiene carpeta `ios/`. Si iOS entra, entra desde F5, no al final. → *Decisión registrada; `F11.05` ajustada en consecuencia.* `DESARROLLO.md`
+- [x] **F0.03** — **Decidir el alcance de iOS.** Letrixa es solo Android y no tiene carpeta `ios/`. Si iOS entra, entra desde F5, no al final. → *Decisión registrada; `F11.05` ajustada en consecuencia.* `DESARROLLO.md`
 - [ ] **F0.04** — Inicializar monorepo con Melos: `packages/` Dart puros + `apps/mobile` + `supabase/`. → *`melos bootstrap` resuelve sin error.* `melos.yaml`
 - [ ] **F0.05** — `analysis_options.yaml` estricto: `strict-casts`, `strict-inference`, sin `print()`, warnings **bloqueantes**. Letrixa usa `flutter_lints` por defecto con warnings no bloqueantes; aquí no. → *Falla ante una violación de prueba.* `analysis_options.yaml`
 - [ ] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `melos.yaml`
@@ -103,7 +103,7 @@ F0.03
 
 ## F5 — Cliente base e identidad
 
-- [ ] **F5.01** — Inicializar Flutter con `com.numlexa.app`. Plataformas según `F0.03`. → *Compila y arranca.* `apps/mobile/`
+- [ ] **F5.01** — Inicializar Flutter con `com.numlexa.app`, **solo Android** (`flutter create --platforms=android`, sin carpeta `ios/`). Ver `D-15`. → *Compila y arranca en un dispositivo Android; el repo no contiene `apps/mobile/ios/`.* `apps/mobile/`
 - [ ] **F5.02** — Design system NUMLEXA partiendo de `AppColors` de Letrixa: dualidad NUM/LEX, tema oscuro por defecto, tokens centralizados. → *Ningún color suelto en widgets.* `apps/mobile/lib/theme/`
 - [ ] **F5.03** — Componente `Tile` con variantes de número y de letra: misma silueta, color distinto. → *Ambas variantes renderizan; test de golden.* `apps/mobile/lib/widgets/tile.dart`
 - [ ] **F5.04** — Componente `Clock` con aceleración visual y sonora en los últimos 10 s. → *Sincronizado con el ancla de servidor.* `apps/mobile/lib/widgets/clock.dart`
@@ -174,7 +174,7 @@ F0.03
 - [ ] **F10.03** — Aterrizaje de enlaces compartidos, sin spoilers. → *No revela nada del puzle.* `apps/web/`
 - [ ] **F10.04** — Open Graph por idioma. → *Previsualización correcta en WhatsApp, X y Telegram.* `apps/web/`
 - [ ] **F10.05** — Legales en los 7 idiomas. → *Cumplen requisitos de publicación.* `apps/web/`
-- [ ] **F10.06** — App Links, trasplantados de Letrixa. → *Un enlace abre la app si está instalada.* `apps/web/public/.well-known/`
+- [ ] **F10.06** — **Android App Links** (`assetlinks.json`), trasplantados de Letrixa, bajo `letrixa.app` y sin pisar los de Letrixa. Sin Universal Links de Apple mientras rija `D-15`. → *Un enlace abre la app Android si está instalada.* `apps/web/public/.well-known/`
 - [ ] **F10.07** — Desplegar en **`numlexa.vercel.app`** y publicar bajo **`letrixa.app/numlexa`**. Ver `D-13`. → *Producción accesible en ambas rutas y CI desplegando.* `apps/web/`
 
 ---
@@ -184,8 +184,8 @@ F0.03
 - [ ] **F11.01** — i18n con `gen-l10n`, mismo mecanismo que Letrixa, claves nuevas. → *Ninguna cadena hardcodeada.* `apps/mobile/lib/l10n/`
 - [ ] **F11.02** — Analítica sin PII, con envío diferido sin red. → *Documentado qué se recoge y qué no.* `apps/mobile/`
 - [ ] **F11.03** — Accesibilidad, incluido modo daltónico para la dualidad de color. → *Auditoría pasada.* `apps/mobile/`
-- [ ] **F11.04** — Fichas de tienda por idioma, sin marcas ajenas en el nombre. → *Revisado contra `CLAUDE.md §8`.* `store/`
-- [ ] **F11.05** — Builds firmados según lo decidido en `F0.03`. → *Sube a pista interna sin rechazos.* `apps/mobile/`
+- [ ] **F11.04** — Ficha de **Google Play** por idioma, sin marcas ajenas en el nombre. Sin App Store mientras rija `D-15`. → *Revisado contra `CLAUDE.md §8`.* `store/`
+- [ ] **F11.05** — **Build Android firmado**: keystore de subida fuera del repo, `key.properties` ignorado, secreto en GitHub Actions, App Bundle (`.aab`) release. Sin iOS: ver `D-15`. → *El `.aab` firmado sube a la pista interna de Play sin rechazos.* `apps/mobile/`
 - [ ] **F11.06** — **Verificar que producción y repositorio coinciden** antes de publicar. → *Migraciones y funciones desplegadas == las del repo. Ver dolor #5.* `supabase/`
 
 ---
@@ -257,6 +257,19 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 **Efectos sobre el plan:** los criterios de `F2.01`, `F2.04`, `F2.05`, `F2.12` y `F5.09` se leen como *"español completo primero; cada idioma adicional repite el mismo pipeline al incorporarse"*. **No se relaja `F2.02`:** la capa de normalización se construye genérica desde el día uno, porque la prohibición de `toLowerCase()`/`toUpperCase()` en el pipeline es una regla estructural, no un detalle de turco; retrofitearla después es justamente el incidente que ya pagó Letrixa. `F11.01` (i18n con `gen-l10n`) se monta desde el principio aunque solo haya un idioma cargado: no se hardcodean cadenas «porque de momento solo hay español».
 **Nota de material:** el diccionario español ya está aportado en la raíz (`spanish_words.json`, 131.655 entradas). Ver `BACKLOG` para su estado real.
 
+### D-15 — Solo Android · iOS aplazado y condicionado
+**Contexto:** Letrixa es solo Android y no tiene carpeta `ios/`. Publicar en iOS exige cuenta de desarrollador de Apple (**99 $/año, recurrente**), que hoy no existe, más un Mac para compilar y firmar. Google Play es **25 $ pago único** y la cuenta ya existe por Letrixa (confirmar antes de `F11.05`).
+**Decisión:** **NUMLEXA se construye solo para Android.** No se crea carpeta `ios/`: `F5.01` inicializa con `flutter create --platforms=android`. iOS se reabre **solo si la app despega en Play Store**, y entonces entra como **fase propia (`F12`), no colada al final de `F11`** — precisamente la trampa que `F0.03` advertía.
+**Por qué se decide así y no «por si acaso»:** una carpeta `ios/` que nadie compila ni prueba no es una opción abierta, es deuda invisible que se pudre y da falsa sensación de portabilidad. Es preferible no tenerla y pagar el port entero el día que haya razón para pagarlo.
+**Coste evitado:** 99 $/año de Apple más el tiempo de mantener una plataforma sin usuarios.
+**Seguro barato que sí se paga desde hoy** — reglas vinculantes para que el port futuro sea caro pero no imposible:
+1. Todo lo de `packages/` es **Dart puro y sin Flutter** (`D-01`): ya es portable por construcción, y eso es la mayor parte del valor del proyecto.
+2. **Ninguna dependencia exclusiva de Android sin equivalente iOS conocido.** Si no lo hay, se anota en `BACKLOG` al añadirla, no después.
+3. **Nada de `Platform.isAndroid` esparcido por la UI.** Cualquier diferencia de plataforma vive detrás de una única capa, no repartida en widgets.
+4. La identidad por `device_id` heredada de Letrixa (`F4.03`) debe seguir siendo **agnóstica de plataforma**: no se ata a un identificador que solo exista en Android.
+**Efectos sobre el plan:** ajustadas `F5.01` (solo Android), `F10.06` (Android App Links, sin Universal Links), `F11.04` (solo ficha de Play) y `F11.05` (build `.aab` firmado para Play, keystore fuera del repo). `F0.12` (`run.ps1`) ya apuntaba a Android.
+**Condición de revisión:** tracción real en Play Store. Se reabre entonces, con `F12` propia y presupuesto explícito.
+
 ---
 
 ## INVENTARIO LETRIXA
@@ -296,6 +309,8 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 ---
 
 ## BITÁCORA
+
+**2026-08-19 · F0.03** — Alcance de plataformas cerrado: **solo Android** (`D-15`). Sin cuenta de desarrollador de Apple, y no se abre una por especulación: 99 $/año recurrentes frente a los 25 $ de pago único de Play, que además ya está cubierto por Letrixa (confirmar antes de `F11.05`). Decisión deliberada de **no crear la carpeta `ios/`**: una plataforma que nadie compila ni prueba no es una opción abierta, es deuda que se pudre. A cambio se pagan hoy cuatro seguros baratos para que el port no sea imposible más tarde —`packages/` ya es Dart puro y portable, prohibición de dependencias solo-Android sin equivalente, nada de `Platform.isAndroid` disperso por la UI, y `device_id` agnóstico de plataforma—. Si iOS vuelve, vuelve como **fase `F12` propia**, no colado al final de `F11`, que es justo lo que la tarea advertía. Ajustadas en consecuencia `F5.01`, `F10.06`, `F11.04` y `F11.05`. Verificación documental de nuevo: sigue sin existir `melos.yaml` (`F0.04` es la siguiente).
 
 **2026-08-19 · F0.02** — Tier de Supabase decidido: **Free permanente, 0 $/mes** (`D-12`). Comprobado que `pg_cron` no es la variable —está en todos los planes— sino la fiabilidad: el Free se pausa tras ~7 días de inactividad. Se asume a sabiendas el patrón de GitHub Actions cron, o sea el dolor #3, con la razón escrita y tres reglas vinculantes que lo hacen sostenible (reintento + alerta visible, idempotencia, nada de producción sobre `pg_cron`). Sorpresa útil: el propio cron de GitHub mantiene el proyecto despierto, así que la pausa del Free deja de ser un problema práctico. Verificado que el proyecto `ggnnesmpuqgjkqarwphm` responde y está despierto; el plan no es consultable con la clave `anon`, lo aportó el usuario. No se ha ejecutado `melos run verify`: aún no existe `melos.yaml` (`F0.04`), la verificación de esta tarea es documental. Detectada además una discrepancia entre plan y realidad (`CLAUDE.md §3`): `F0.01` figuraba como `[x]` pero **el repositorio no tenía ningún commit**, así que este es el commit inicial y arrastra también `CLAUDE.md`. `spanish_words.json` e `icon.webp` se dejan **sin versionar** a propósito hasta `F0.11` (LFS y `.gitignore`) y `F2.01`. **Además, registradas tres desviaciones del plan indicadas por el usuario, sin implementar ninguna:** `D-13` (la web pasa a `numlexa.vercel.app` bajo `letrixa.app/numlexa`, corregidas `F10.07` y `F7.06`), `D-14` (español primero) y la nueva tarea `F0.12` (script `run.ps1` de arranque con credenciales, que depende de `F5.01`).
 
