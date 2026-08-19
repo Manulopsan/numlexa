@@ -1,0 +1,70 @@
+# CI de NUMLEXA. Ejecuta `melos run verify` en cada push y en cada PR.
+#
+# Por que existe (CLAUDE.md §10, D-11): Letrixa no tiene CI de aplicacion —sus
+# cinco workflows son solo cron— y acabo con ~0% de cobertura y con el repo
+# divergiendo de produccion. Aqui el CI es bloqueante desde el primer dia.
+#
+# Ademas, por `D-16` la toolchain local es una instalacion de Flutter de
+# Windows invocada desde WSL. Este workflow corre sobre Linux con un SDK
+# propio, asi que es la UNICA verificacion independiente de esa particularidad.
+# Si algo pasa en local y falla aqui, manda este.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Un push nuevo sobre la misma rama cancela la ejecucion anterior: no tiene
+# sentido gastar minutos en verificar un commit ya superado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimo privilegio: este workflow solo lee el codigo. El despliegue, que si
+# necesita secretos, vive aparte en `deploy.yml` (F0.09).
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # El nombre del job es el que hay que marcar como "required status check"
+    # en la proteccion de rama para que sea BLOQUEANTE en PR. Si se renombra,
+    # hay que actualizarlo tambien alli o el PR dejara de estar protegido sin
+    # que nadie se entere.
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar el SDK de Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          # Version fijada, no `stable`: que el SDK cambie solo es exactamente
+          # el tipo de deriva que este proyecto no quiere. Ver `D-16`.
+          sdk: 3.10.4
+
+      - name: Cache de pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Resolver dependencias del workspace
+        run: dart pub get
+
+      - name: melos bootstrap
+        run: dart run melos bootstrap
+
+      # `verify` = format + analyze + ignores + test con umbral de cobertura
+      # (F0.07). Se invoca con `dart run melos` a proposito: el pipeline es
+      # autocontenido y no exige activar Melos globalmente en el runner.
+      - name: verify
+        run: dart run melos run verify

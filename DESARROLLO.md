@@ -24,7 +24,7 @@ F0.08
 - [x] **F0.05** — `analysis_options.yaml` estricto: `strict-casts`, `strict-inference`, sin `print()`, warnings **bloqueantes**. Letrixa usa `flutter_lints` por defecto con warnings no bloqueantes; aquí no. → *Falla ante una violación de prueba.* `analysis_options.yaml`
 - [x] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [x] **F0.07** — Script `melos run verify` = analyze + format + test **+ ignores**. → *Un solo comando devuelve 0 con el repo limpio.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
-- [ ] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
+- [~] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
 - [ ] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
 - [ ] **F0.10** — **Infraestructura de vectores de conformidad**: `conformance/*.json` con casos dorados, consumidos por los tests de Dart y por los de Deno. → *Un cambio de fórmula en un solo lado rompe el build. Ver `D-08`.* `conformance/`
 - [ ] **F0.11** — Git LFS para `data/dist/`, `.gitignore` para `data/raw/`. → *Un binario de prueba se versiona por LFS.* `.gitattributes`
@@ -316,6 +316,10 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F0.08 (en curso)** — Escrito `.github/workflows/ci.yml`: `verify` sobre `ubuntu-latest`, disparado en push a `main`, en cada pull request y a mano. SDK de Dart **fijado a 3.10.4**, no `stable`: que el SDK cambie solo es justo la deriva que este proyecto no quiere (`D-16`). Cache de `~/.pub-cache` por hash de `pubspec.lock`, `concurrency` para cancelar ejecuciones superadas, `permissions: contents: read` por mínimo privilegio —los secretos son cosa de `deploy.yml` en `F0.09`— y `timeout-minutes: 20`.
+**Verificado lo verificable:** YAML válido y, desde estado limpio (`.dart_tool` y `coverage` borrados), la secuencia exacta del workflow —`dart pub get` → `dart run melos bootstrap` → `dart run melos run verify`— devuelve **rc=0** en los tres pasos.
+**Por qué queda `[~]` y no `[x]`:** el criterio pide *workflow verde en el primer push* y *bloqueante en PR*, y **ninguna de las dos mitades es verificable desde aquí**. No hay credenciales de GitHub en este entorno (`git ls-remote` falla con «could not read Username») y `gh` no está instalado, así que no puedo pushear ni comprobar que la ejecución sale verde. Y lo de «bloqueante» no es una propiedad del fichero: es la protección de rama de GitHub marcando el check `verify` como requerido, que es una configuración del repositorio, no del repo. Marcarla `[x]` sería exactamente el dolor #5 —dar por terminado algo que no está desplegado—, así que se queda abierta con los dos pasos pendientes anotados en `BLOQUEOS`.
+
 **2026-08-19 · F0.07** — `melos run verify` existe y devuelve **0** con el repositorio limpio. Cuatro puertas encadenadas, en orden de coste creciente para que falle pronto: `format` → `analyze` → `ignores` → `test`. Cada una es también un script suelto, para que el CI de `F0.08` pueda reutilizarlas por separado sin duplicar comandos.
 **Añadida una cuarta puerta que la tarea no pedía:** `ignores`, que ejecuta `scripts/check_ignores.dart`. `CLAUDE.md §7` prohíbe `// ignore:` sin justificar y **no existe lint que lo compruebe**; quedó anotado en `BACKLOG` durante F0.05 y este era su sitio natural. Convención fijada: una directiva está justificada si la línea inmediatamente anterior es un comentario `//` con texto que no sea otra directiva. Limitación asumida y documentada en el propio script: analiza texto plano, así que un `// ignore:` dentro de un literal de cadena contaría; se prefiere ese falso positivo, que se ve y se corrige, a dejar pasar uno de verdad.
 **`analyze` usa `--fatal-infos --fatal-warnings`,** no solo las reglas que F0.05 elevó a `error`. Así bloquea también lo que se quede en severidad `info`, que es donde por defecto viven casi todos los lints.
@@ -362,4 +366,6 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BLOQUEOS
 
-_(ninguno)_
+- **`F0.08` — dos pasos que solo puede dar el usuario.**
+  1. **Push.** No hay credenciales de GitHub en el entorno de trabajo (`git ls-remote origin` falla al pedir usuario) ni `gh` instalado. Hace falta `git push -u origin main` para que el workflow se ejecute por primera vez y se pueda comprobar que sale verde.
+  2. **Hacerlo bloqueante.** En GitHub: *Settings → Branches → Add branch ruleset* (o *Branch protection rule*) sobre `main`, activando **Require status checks to pass** y marcando el check **`verify`**. El nombre tiene que coincidir con el `name:` del job; si se renombra el job y no se actualiza ahí, el PR deja de estar protegido sin que nadie se entere.
