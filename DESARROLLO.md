@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F1.01
+F1.02
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -36,7 +36,7 @@ F1.01
 
 > Net-new. Letrixa no tiene nada numérico. Bloquea niveles, bot y reto diario.
 
-- [ ] **F1.01** — Tipos en `numlexa_numbers`: `Tile`, `TileSet`, `Target`, `Expression`, `Solution`, `PuzzleMeta`. → *Sin estados imposibles representables.* `packages/numlexa_numbers/lib/src/types.dart`
+- [x] **F1.01** — Tipos en `numlexa_numbers`: `Tile`, `TileSet`, `Target`, `Expression`, `Solution`, `PuzzleMeta`. → *Sin estados imposibles representables.* `packages/numlexa_numbers/lib/src/types.dart`
 - [ ] **F1.02** — `evaluate(expr)`, que devuelve `null` si algún paso intermedio no es entero positivo o si hay división inexacta. → *`100/3` → null · `3-5` → null · `(75+25)*7` → 700.* `packages/numlexa_numbers/lib/src/evaluate.dart`
 - [ ] **F1.03** — Enumerar los multiconjuntos válidos de 6 fichas (0–4 grandes). → *La cuenta coincide con el cálculo combinatorio hecho a mano y documentado en la bitácora.* `packages/numlexa_numbers/lib/src/enumerate.dart`
 - [ ] **F1.04** — DP sobre subconjuntos: `reachable(tiles)` recorriendo particiones `S = A ⊎ B`. → *Para `[25,50,75,100,3,6]` contiene 952 y no contiene 1000000.* `packages/numlexa_numbers/lib/src/dp.dart`
@@ -329,6 +329,13 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F1.01 — CERRADA** — Los seis tipos del motor de cifras, con los tests escritos **antes** que la implementación (`CLAUDE.md §7`): 36 tests, y los vi fallar por «loading» antes de que existiera `types.dart`.
+**Qué queda irrepresentable:** una ficha que no sea 1–10 o {25,50,75,100}; un tablero que no tenga exactamente seis fichas o que repita una grande, o una pequeña tres veces; un objetivo fuera de `[101,999]`; una hoja que apunte fuera del tablero; **una expresión que use dos veces la misma ficha**; una solución con valor ≤ 0; y unas métricas con cero soluciones o con un número de operaciones que seis fichas no permiten.
+**La excepción es deliberada y está escrita en el propio código:** `Expression` **sí** puede representar `3 - 5` o `100 / 3`. El servidor recibe expresiones de los clientes y tiene que poder **representarlas para rechazarlas** (`CLAUDE.md §6`, régimen B). Si fueran irrepresentables, la validación se colaría dentro del parseo, que es mucho más difícil de probar. Esa es exactamente la frontera que separa `Expression` de `Solution`: la primera es sintaxis, la segunda es una garantía, y solo el evaluador de F1.02 puede producirla.
+**Decisión que salió al escribir los tests:** `TileSet` **normaliza el orden de las fichas** de mayor a menor. No es estética. Los índices de `TileLeaf` apuntan a esa lista, así que sin un orden canónico la misma expresión significaría cosas distintas según cómo se hubiera construido el tablero — un error silencioso y carísimo de encontrar. Fijado con un test que comprueba el orden exacto y explica por qué.
+**Segunda decisión forzada por los tests:** `PuzzleMeta` no tiene constructor `const`. Validar lanzando `ArgumentError` y ser `const` son incompatibles, y la alternativa —`assert`— **desaparece en release**, que es justo donde la garantía importa. Se elige validación real sobre constantes en tiempo de compilación.
+**El umbral de cobertura mordió de verdad, por primera vez:** la implementación entró con **88,1% (118/134)** y `verify` se cayó. Las 16 líneas sin cubrir eran todas `toString()`. No bajé el umbral: los cubrí con tests que **fijan su forma**, porque esos `toString` son lo que se leerá en cada `ArgumentError` y en cada fallo del evaluador. Resultado: **100% (134/134)**.
+
 **2026-08-19 · F0.11 — CERRADA. Con ella se cierra F0 salvo `F0.12`, bloqueada por dependencia.** `.gitattributes` hace tres cosas y ninguna es decorativa.
 **Primera, `* text=auto eol=lf`.** No estaba en el enunciado de la tarea; lo añadí porque el incidente ya había ocurrido: un editor de Windows reescribió `spanish_words.json` en CRLF y git marcó 131.656 líneas como modificadas sin que cambiara una palabra. Si le pasa a un `.dart`, la puerta `format` del CI falla **en Linux** por algo que en la máquina de quien lo causó se ve perfecto. Comprobado que la normalización no produce ni un cambio espurio en el árbol existente, y que el CI sigue verde (`3e34c70`).
 **Segunda, LFS sobre `data/dist/**`,** deliberadamente amplio en vez de una lista de extensiones. Un formato nuevo entra por LFS sin que nadie tenga que acordarse de añadirlo; un binario colado como fichero normal **no produce ningún error**, y ese es precisamente el fallo silencioso que se quiere evitar. La documentación de la carpeta se exime con `!filter !diff !merge` para que siga leyéndose en GitHub.
@@ -424,6 +431,7 @@ La cuarta fila es la que cierra el argumento: el JSON es la autoridad, y cambiar
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
 - **`F0.11` debe incluir `* text=auto eol=lf` en `.gitattributes`, no solo las reglas de LFS.** Ya ha pasado una vez: un editor de Windows reescribió `spanish_words.json` en CRLF y git marcó las 131.656 líneas como modificadas sin que cambiara una sola palabra. Se restauró sin pérdida, pero si le ocurre a un `.dart` la puerta `format` del CI falla en Linux por algo que en local se ve perfecto — el peor tipo de fallo, el que no se reproduce en la máquina de quien lo causó.
 - **`icon.webp` y `spanish_words.json` entraron en el historial de git** en el commit `91f02ab` («first upload»), en la raíz y **sin LFS** (1,8 MB el diccionario). No es grave y no se reescribe historia ya empujada, pero: cuando `F2.01` mueva el diccionario a `data/raw/` —que va ignorado— hay que **dejar de versionar la copia de la raíz**, y `F0.11` debe cubrir `data/dist/` con LFS antes de que aparezca el primer binario generado, que sí será grande.
+- **Hace falta un renderizador de expresiones para el usuario.** `Expression.toString()` produce `((TileLeaf(0) + TileLeaf(1)) * TileLeaf(2))`, que sirve para depurar pero no para enseñar. Mostrar `((100 + 75) * 4)` exige el `TileSet`, porque las hojas son posiciones, no valores. Corresponde a `F1.06` (solver) o `F5.08` (pantalla de resultado), no a los tipos.
 - **Vigilar la cuota de LFS de GitHub.** El plan gratuito da 1 GB de almacenamiento y 1 GB/mes de ancho de banda por cuenta, y en un repositorio **público** el ancho de banda que consumen los clones lo paga el propietario. Los artefactos previstos son de pocos MB, pero **cada regeneración añade una versión nueva** al almacenamiento de LFS. Revisar el consumo cuando `F1.08` empiece a producir bitmaps de verdad.
 - **Instalar Deno en la máquina de desarrollo y meter `conformance` dentro de `verify` local.** Hoy `melos run verify` solo cubre la mitad Dart; la mitad TypeScript se verifica en el CI, que es bloqueante, y con `melos run conformance` a mano. Deno hará falta igualmente en `F1.14`. Valorar entonces añadir también `deno fmt --check`, que hoy se deja fuera para no exigir Deno en local.
 - **Acotar el `SUPABASE_ACCESS_TOKEN`.** Hoy es un token de permisos amplios sobre la organización `Manulopsan`, elegido a propósito para dejar de adivinar scopes tras cuatro intentos fallidos. Ahora que el workflow pasa, se puede mirar qué llamadas hace realmente y reducirlo con datos en vez de por suposición.

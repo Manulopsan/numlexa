@@ -3,3 +3,5 @@
 /// Paquete Dart puro: no depende de Flutter (ver `D-01`). El contenido llega
 /// en F1 — evaluacion de expresiones, DP de alcanzabilidad, solver y pool.
 library;
+
+export 'src/types.dart';
