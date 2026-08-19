@@ -12,6 +12,7 @@ workspace:
 
 dev_dependencies:
   melos: ^8.3.0
+  lints: ^6.1.0
 
 # Configuracion de Melos.
 #

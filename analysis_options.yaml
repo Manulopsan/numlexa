@@ -1,0 +1,75 @@
+# Reglas de analisis de NUMLEXA. Aplican a todo el monorepo.
+#
+# Letrixa usa `flutter_lints` por defecto con warnings NO bloqueantes. Aqui no:
+# lo que esta escrito abajo como `error` tumba el build, no adorna el editor.
+#
+# `apps/mobile` (F5.01) tendra su propio `analysis_options.yaml` que incluya
+# ESTE mediante `include: ../../analysis_options.yaml` y anada `flutter_lints`.
+# Nada de relajar la raiz para que la app compile.
+
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    # CLAUDE.md §7: sin `dynamic` evitable. Estos tres cierran las tres vias
+    # por las que `dynamic` se cuela sin que nadie lo escriba.
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+  errors:
+    # --- CLAUDE.md §7, elevados a error: no son sugerencias ---
+    avoid_print: error
+    avoid_dynamic_calls: error
+    always_declare_return_types: error
+    unawaited_futures: error
+
+    # --- Correccion: en un juego con reloj, esto son bugs, no estilo ---
+    throw_in_finally: error
+    literal_only_boolean_expressions: error
+    no_adjacent_strings_in_list: error
+    test_types_in_equals: error
+    cancel_subscriptions: error
+    close_sinks: error
+    collection_methods_unrelated_type: error
+    unrelated_type_equality_checks: error
+
+    # --- Higiene: codigo muerto o a medias no entra ---
+    unused_import: error
+    unused_local_variable: error
+    unused_element: error
+    unused_field: error
+    dead_code: error
+
+    # Los TODO no bloquean: lo que bloquea es el BACKLOG de DESARROLLO.md.
+    todo: ignore
+
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/*.mocks.dart"
+
+linter:
+  rules:
+    # Reglas activadas ademas de `lints/recommended`. Lista corta y deliberada:
+    # se busca corregir errores reales, no imponer un estilo exhaustivo.
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    # OJO: escalar una regla en `analyzer.errors` NO la activa. Si no esta en
+    # esta lista (o en `lints/recommended`), la severidad no se aplica y el
+    # fallo pasa desapercibido. `avoid_print` cayo exactamente en esa trampa
+    # durante F0.05 y solo se vio porque la prueba de violacion la buscaba.
+    - avoid_print
+    - avoid_slow_async_io
+    - cancel_subscriptions
+    - close_sinks
+    - collection_methods_unrelated_type
+    - directives_ordering
+    - literal_only_boolean_expressions
+    - no_adjacent_strings_in_list
+    - prefer_final_in_for_each
+    - prefer_final_locals
+    - test_types_in_equals
+    - throw_in_finally
+    - unawaited_futures
+    - unnecessary_statements

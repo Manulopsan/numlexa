@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F0.05
+F0.06
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -21,7 +21,7 @@ F0.05
 - [x] **F0.02** — **Decidir el tier de Supabase con `pg_cron` disponible** antes de escribir una sola tarea programada. → *Decisión registrada con el coste mensual. Si no hay pg_cron, se asume conscientemente el patrón de GitHub Actions cron y se documenta por qué.* `DESARROLLO.md`
 - [x] **F0.03** — **Decidir el alcance de iOS.** Letrixa es solo Android y no tiene carpeta `ios/`. Si iOS entra, entra desde F5, no al final. → *Decisión registrada; `F11.05` ajustada en consecuencia.* `DESARROLLO.md`
 - [x] **F0.04** — Inicializar monorepo con Melos: `packages/` Dart puros + `apps/mobile` + `supabase/`. → *`melos bootstrap` resuelve sin error.* `pubspec.yaml` *(no `melos.yaml`: ver `D-16`)*
-- [ ] **F0.05** — `analysis_options.yaml` estricto: `strict-casts`, `strict-inference`, sin `print()`, warnings **bloqueantes**. Letrixa usa `flutter_lints` por defecto con warnings no bloqueantes; aquí no. → *Falla ante una violación de prueba.* `analysis_options.yaml`
+- [x] **F0.05** — `analysis_options.yaml` estricto: `strict-casts`, `strict-inference`, sin `print()`, warnings **bloqueantes**. Letrixa usa `flutter_lints` por defecto con warnings no bloqueantes; aquí no. → *Falla ante una violación de prueba.* `analysis_options.yaml`
 - [ ] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [ ] **F0.07** — Script `melos run verify` = analyze + format + test. → *Un solo comando devuelve 0 con el repo limpio.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [ ] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
@@ -316,6 +316,11 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F0.05** — `analysis_options.yaml` estricto en la raíz, aplicando a todo el monorepo. `strict-casts`, `strict-inference` y además `strict-raw-types`, que es la tercera vía por la que `dynamic` se cuela sin que nadie lo escriba. Sobre `lints/recommended`, una lista corta y deliberada de reglas extra, y **quince diagnósticos elevados a `error`** en `analyzer.errors` para que tumben el build por sí solos, sin depender de que alguien recuerde pasar `--fatal-infos`. `todo: ignore`: lo que bloquea es el `BACKLOG`, no un comentario.
+**Criterio verificado de verdad, no por inspección:** escribí un fichero con violaciones deliberadas y `dart analyze` devolvió **rc=3** con 8 incidencias; borrado el fichero, vuelve a rc=0. Comprobadas una por una, en tres tandas, todas las reglas escaladas: `always_declare_return_types`, `invalid_assignment` por strict-casts, `strict_raw_type`, `inference_failure`, `avoid_dynamic_calls`, `unused_local_variable`, `avoid_print`, `unrelated_type_equality_checks`, `literal_only_boolean_expressions`, `unawaited_futures` y `dead_code`.
+**Sorpresa, y de la misma familia silenciosa que la de F0.04:** `avoid_print` **no saltaba**. Escalar una regla en `analyzer.errors` **no la activa**; si no está en `linter.rules` ni viene de `lints/recommended`, la severidad se ignora sin decir nada. O sea que la prohibición de `print()` de `CLAUDE.md §7` estaba escrita en el fichero y no se aplicaba. Solo se vio porque la prueba de violación la buscaba explícitamente. Añadida a `linter.rules` con un comentario que explica la trampa, y auditado el resto de la lista de `errors:` en vez de darla por buena.
+**Aprendizaje de método:** dos tareas seguidas con un fallo silencioso de configuración. Una regla de calidad que no se ha visto fallar no está activa; está escrita, que no es lo mismo.
+
 **2026-08-19 · F0.04** — Monorepo inicializado. `melos bootstrap` resuelve sin error con **3 paquetes**: `numlexa_core`, `numlexa_numbers` y `numlexa_letters`, los tres Dart puros, sin Flutter y con `resolution: workspace`. Añadido el esqueleto de `supabase/` (`migrations/`, `functions/`, `tests/`) con un README que deja escritas las dos restricciones que condicionan lo que entre ahí: tier Free sin `pg_cron` en producción (`D-12`) y vectores de conformidad obligatorios (`D-08`). `dart analyze` limpio.
 **Sorpresa, y de las que fallan en silencio:** `melos.yaml` **no funciona** con Melos 8. La configuración va en `pubspec.yaml` bajo la clave `melos:`, y un `melos.yaml` en la raíz se ignora sin avisar — lo detecté porque `ide.intellij.enabled: false` no hacía nada hasta moverlo. Gana el código (`CLAUDE.md §3`): borrado `melos.yaml`, corregidas las referencias de fichero de `F0.04`, `F0.06` y `F0.07`, y registrado en `D-16`.
 **Segunda sorpresa:** Flutter y Dart están instalados **en Windows**, no en WSL, así que desde aquí hay que llamar a `dart.exe` por interop; el `bin/dart` de Linux revienta buscando un `dart-sdk` que no existe. También en `D-16`, porque afecta a `F0.07`, `F0.08` y `F0.12`.
@@ -337,6 +342,7 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 - **`spanish_words.json` aportado en la raíz** (131.655 entradas, lista plana sin frecuencias). Inspección rápida: contiene **nombres propios** (`abraham`, `alemania`, `afganistan`, `alcalá`) y **siglas** (`abs`, `adn`, `adsl`), justo lo que `F2.04` debe filtrar. Además, al no traer rangos de frecuencia, `F2.05` necesitará una lista externa. Moverlo a `data/raw/` en `F2.01`, no antes.
 - **`icon.webp` en la raíz.** Colocarlo en `apps/mobile` cuando exista (`F5.01`/`F5.02`), generar densidades y adaptive icon. No tocar hasta entonces.
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
+- **`CLAUDE.md §7` prohíbe `// ignore:` sin justificar, y no existe lint que lo compruebe.** Se cubre en `F0.07` con un `grep` dentro de `verify` que falle ante un `// ignore:` sin comentario de justificación en la línea anterior. Anotado aquí para que no se pierda entre F0.05 y F0.07.
 - **Credenciales:** la clave `anon` de Supabase es pública por diseño y puede viajar en el `run.ps1` y en el binario. La `service_role` **no entra jamás** en el repo, ni en el script, ni en un `--dart-define`; su sitio son los secretos de GitHub Actions (`F0.09`).
 
 ---
