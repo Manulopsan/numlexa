@@ -24,7 +24,7 @@ F0.08
 - [x] **F0.05** — `analysis_options.yaml` estricto: `strict-casts`, `strict-inference`, sin `print()`, warnings **bloqueantes**. Letrixa usa `flutter_lints` por defecto con warnings no bloqueantes; aquí no. → *Falla ante una violación de prueba.* `analysis_options.yaml`
 - [x] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [x] **F0.07** — Script `melos run verify` = analyze + format + test **+ ignores**. → *Un solo comando devuelve 0 con el repo limpio.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
-- [~] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
+- [x] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
 - [~] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
 - [ ] **F0.10** — **Infraestructura de vectores de conformidad**: `conformance/*.json` con casos dorados, consumidos por los tests de Dart y por los de Deno. → *Un cambio de fórmula en un solo lado rompe el build. Ver `D-08`.* `conformance/`
 - [ ] **F0.11** — Git LFS para `data/dist/`, `.gitignore` para `data/raw/`. → *Un binario de prueba se versiona por LFS.* `.gitattributes`
@@ -276,6 +276,13 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 **Segunda mitad, sobre el entorno:** la instalación de Flutter y Dart es de **Windows** (`C:\Users\manul\develop\flutter`), no de WSL, y el repositorio vive en una ruta de Windows. Desde WSL el script `bin/dart` falla porque busca un `dart-sdk` de Linux que no existe; hay que invocar **`dart.exe` / `flutter.bat`** por interop. Consecuencias vinculantes: `F0.12` (`run.ps1`) es PowerShell y es el camino natural de ejecución; `F0.08` (CI) corre sobre runners Linux con su propio SDK y por tanto **el CI es la única verificación que no depende de esta particularidad local**, razón de más para que sea bloqueante; y ningún script del repo puede asumir que existe un `dart` en el `PATH` de Linux.
 **Versiones fijadas:** Dart SDK 3.10.4 · Melos 8.3.0 · constraint `sdk: ^3.10.0` en los tres paquetes.
 
+### D-17 — Repositorio público, y lo que eso obliga a resolver antes de F7.01
+**Contexto:** el criterio de `F0.08` exige que el check `verify` sea **bloqueante en PR**, y GitHub reserva la protección de rama —tanto la clásica como los rulesets— a repositorios **públicos o de plan Pro**. Con el repositorio privado, la API devuelve `403: Upgrade to GitHub Pro or make this repository public`. Pagar Pro contradice `D-12`, que fijó no asumir costes fijos hasta que la app genere ingresos.
+**Decisión:** el repositorio pasa a **público**. Cierra `F0.08` sin coste y además convierte los minutos de Actions en ilimitados, lo que refuerza `D-12` en vez de contradecirlo.
+**Configuración aplicada:** check `verify` requerido en `main`, `strict: true` (la rama debe estar al día), sin force-push y sin borrado de rama. **`enforce_admins: false` a propósito**, para que el flujo de este proyecto —un commit por tarea directamente sobre `main`— siga siendo posible. El bloqueo aplica a los PR, que es lo que pide el criterio.
+**Consecuencia que hay que resolver, y que no es menor:** por `D-10` el reto diario se genera **en cliente de forma determinista**. Con el repositorio público, la semilla y el algoritmo quedan a la vista y cualquiera puede precomputar los retos futuros. Hoy ese código no existe, así que no hay nada expuesto todavía, pero **antes de `F7.01` y `F7.02` hay que decidir cómo se protege la semilla** —no embarcarla en el repositorio, derivarla de un secreto entregado por el servidor, o aceptar explícitamente la exposición apoyándose en que `F7.03` valida el envío al ranking en servidor—. Queda como bloqueo declarado de F7, no como sorpresa.
+**Además:** nada de secretos en el repositorio. La clave `anon` de Supabase es pública por diseño y puede ir en el cliente; la `service_role` y el keystore de `F11.05` **jamás**. Eso ya estaba escrito, pero ahora deja de ser higiene y pasa a ser crítico.
+
 ---
 
 ## INVENTARIO LETRIXA
@@ -315,6 +322,10 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 ---
 
 ## BITÁCORA
+
+**2026-08-19 · F0.08 — CERRADA** — Workflow **verde en el primer push** (`91f02ab`) y también en el siguiente (`b25760a`): los 7 pasos del job `verify` en success, incluido el propio `melos run verify` corriendo sobre Linux con SDK propio. Esa era la mitad fácil.
+**La mitad difícil obligó a una decisión nueva (`D-17`):** «bloqueante en PR» resultó **imposible** con el repositorio privado. GitHub reserva la protección de rama a repos públicos o a plan Pro y devolvía `403: Upgrade to GitHub Pro or make this repository public`. Pagar contradice `D-12`. Decidido con el usuario: **repositorio público**, que además hace ilimitados los minutos de Actions. Configurado el check `verify` como requerido en `main`, con `strict: true`, sin force-push y sin borrado de rama, y **`enforce_admins: false` a propósito** para que el flujo de un commit por tarea directamente sobre `main` siga funcionando. Confirmado en la práctica: el siguiente push devolvió `remote: - Required status check "verify" is expected`.
+**Contrapartida registrada, no barrida bajo la alfombra:** un repositorio público expone la semilla del reto diario, que por `D-10` se genera en cliente. Hay que resolverlo **antes de `F7.01`**; está escrito en `D-17` y en `BLOQUEOS`.
 
 **2026-08-19 · F0.09 (en curso)** — Escrito `.github/workflows/deploy.yml`: `supabase link` → `db push` → `functions deploy`, disparado al empujar a `main` **solo si cambia algo desplegable** (`paths: supabase/**`), más ejecución manual. Añadido también `supabase/config.toml` mediante `supabase init`: sin él el CLI no reconoce el directorio como proyecto y ningún paso del workflow podría funcionar.
 **Decisiones que van dentro, y por qué:**
@@ -379,12 +390,5 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BLOQUEOS
 
-- **`F0.08` — dos pasos que solo puede dar el usuario.**
-  1. **Push.** No hay credenciales de GitHub en el entorno de trabajo (`git ls-remote origin` falla al pedir usuario) ni `gh` instalado. Hace falta `git push -u origin main` para que el workflow se ejecute por primera vez y se pueda comprobar que sale verde.
-  2. **Hacerlo bloqueante.** En GitHub: *Settings → Branches → Add branch ruleset* (o *Branch protection rule*) sobre `main`, activando **Require status checks to pass** y marcando el check **`verify`**. El nombre tiene que coincidir con el `name:` del job; si se renombra el job y no se actualiza ahí, el PR deja de estar protegido sin que nadie se entere.
-
-- **`F0.09` — dos secretos que solo puede poner el usuario.** En *Settings → Secrets and variables → Actions*:
-  - `SUPABASE_ACCESS_TOKEN` — token personal del CLI, desde <https://supabase.com/dashboard/account/tokens>.
-  - `SUPABASE_DB_PASSWORD` — contraseña de Postgres del proyecto `ggnnesmpuqgjkqarwphm`.
-
-  Sin ellos el workflow se para en el primer paso diciendo cuál falta, que es el comportamiento buscado. Hasta que no se ejecute una vez de verdad, `F0.09` no se cierra.
+- **`F0.09` — el `SUPABASE_ACCESS_TOKEN` no tiene privilegios sobre el proyecto.** Los dos secretos están puestos y el paso de comprobación los ve, pero `supabase link` falla con: `Unexpected error retrieving remote project status: {"message":"Your account does not have the necessary privileges to access this endpoint"}`. Eso es el **token de acceso**, no la contraseña de la base de datos. Causa más probable: en `SUPABASE_ACCESS_TOKEN` hay algo que no es un token del CLI —un token válido empieza por **`sbp_`**—, o el token pertenece a una cuenta que no es propietaria del proyecto `ggnnesmpuqgjkqarwphm`, o está limitado a otra organización. Hay que regenerarlo en <https://supabase.com/dashboard/account/tokens> con la cuenta dueña del proyecto y volver a guardarlo.
+- **`F7.01` / `F7.02` — proteger la semilla del reto diario** ahora que el repositorio es público. Ver `D-17`. Debe decidirse antes de escribir la generación determinista, no después.
