@@ -329,6 +329,23 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · CIERRE DE SESIÓN** — Estado contrastado contra el repositorio, no contra la memoria: árbol de trabajo limpio, `HEAD` y `origin/main` sincronizados (`0 0`), y los estados declarados aquí coinciden con los ficheros que existen. **124 tests en verde, cobertura 100%.**
+
+**Hecho:** F0 completa salvo `F0.12`, que está `[!]` bloqueada por dependencia y no por problema —necesita `apps/mobile`, que crea `F5.01`—. De F1, las seis primeras: tipos, evaluador, enumeración, DP, bitmap y solver.
+
+**Siguiente:** `F1.07`, métricas de dificultad. Rellena de verdad el `PuzzleMeta` que se definió en F1.01. Criterio: *`PuzzleMeta` completo para cualquier par alcanzable*. Ojo con una cosa al empezarla: `solutionCount` («nº de soluciones») **necesita una definición precisa antes de implementarse**, porque `(100+75)*3` y `3*(100+75)` pueden contarse como una o como dos, y el número que salga condiciona los umbrales de `F1.10`. Es una decisión de producto, no de código.
+
+**Cómo se ejecuta esto** (ver `D-16` y `D-18`; nada de esto está en el `PATH` de Linux):
+- Dart: `/mnt/c/Users/manul/develop/flutter/bin/cache/dart-sdk/bin/dart.exe`
+- Verificación completa: `dart.exe run melos run verify`
+- Git y LFS: `/mnt/c/Program Files/Git/cmd/git.exe` (el de WSL no tiene credenciales ni `git-lfs`)
+- Supabase: `/mnt/c/Users/manul/scoop/shims/supabase.exe` (**no** el `supabase` de WSL, que arrastra una sesión antigua de otra cuenta)
+- Deno: se instaló en `~/.deno/bin/deno` **dentro del entorno de trabajo**, no en la máquina. Si no está en la próxima sesión, hay que reinstalarlo o tirar del CI, que sí lo tiene fijado.
+
+**Infraestructura viva y comprobada hoy:** CI verde y **bloqueante en PR** (check `verify` requerido en `main`, con `enforce_admins: false` para no estorbar el flujo de un commit por tarea). Despliegue de Supabase verde de extremo a extremo contra el proyecto real. LFS operativo. Conformidad Dart↔TypeScript ejecutándose en el mismo job que el resto.
+
+**Bloqueos abiertos:** solo el de `F7.01`/`F7.02` —proteger la semilla del reto diario ahora que el repositorio es público (`D-17`)—, que no estorba hasta F7.
+
 **2026-08-19 · F1.06 — CERRADA. 20 de 20 exactos, peor tiempo 31 ms frente al límite de 200.**
 
 **Observación que simplificó el problema entero:** el número de operaciones **no depende del valor, sino de cuántas fichas se usan**. Una expresión que gasta `k` fichas tiene siempre `k−1` operaciones. Así que «la solución con menos operaciones» es «la que usa menos fichas», y no hay que llevar ninguna contabilidad aparte: sale del popcount de la máscara.
