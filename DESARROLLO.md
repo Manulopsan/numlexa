@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F1.05
+F1.06
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -40,7 +40,7 @@ F1.05
 - [x] **F1.02** — `evaluate(expr)`, que devuelve `null` si algún paso intermedio no es entero positivo o si hay división inexacta. → *`100/3` → null · `3-5` → null · `(75+25)*7` → 700.* `packages/numlexa_numbers/lib/src/evaluate.dart`
 - [x] **F1.03** — Enumerar los multiconjuntos válidos de 6 fichas (0–4 grandes). → *La cuenta coincide con el cálculo combinatorio hecho a mano y documentado en la bitácora.* `packages/numlexa_numbers/lib/src/enumerate.dart`
 - [x] **F1.04** — DP sobre subconjuntos: `reachable(tiles)` recorriendo particiones `S = A ⊎ B`. → *Para `[25,50,75,100,3,6]` contiene 952. **Criterio corregido:** también contiene 1000000 —el enunciado original decía lo contrario y era falso—; lo que no contiene es 999999 ni 1000001. Ver bitácora.* `packages/numlexa_numbers/lib/src/dp.dart`
-- [ ] **F1.05** — Bitmap de alcanzabilidad: 899 bits por multiconjunto. → *Popcount plausible y estable entre ejecuciones.* `packages/numlexa_numbers/lib/src/bitmap.dart`
+- [x] **F1.05** — Bitmap de alcanzabilidad: 899 bits por multiconjunto. → *Popcount plausible y estable entre ejecuciones.* `packages/numlexa_numbers/lib/src/bitmap.dart`
 - [ ] **F1.06** — Solver `solve(tiles, target)`: exacta con mínimo de operaciones, o mejor aproximación. → *20 casos conocidos en <200 ms cada uno.* `packages/numlexa_numbers/lib/src/solve.dart`
 - [ ] **F1.07** — Métricas de dificultad: nº de soluciones, ops mínimas, si exige división intermedia, si exige las 6 fichas. → *`PuzzleMeta` completo para cualquier par alcanzable.* `packages/numlexa_numbers/lib/src/difficulty.dart`
 - [ ] **F1.08** — Generador offline paralelizado que vuelca bitmaps y estadísticas por mezcla. → *Termina en <60 min y produce `data/dist/numbers-bitmap.bin`.* `tools/gen_numbers`
@@ -328,6 +328,16 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 ---
 
 ## BITÁCORA
+
+**2026-08-19 · F1.05 — CERRADA** — `TargetBitmap`: 899 bits, **113 bytes** por multiconjunto, con el bit `i` correspondiendo al objetivo `101 + i`.
+**Popcount plausible y estable, comprobado con un número exacto y no con una impresión.** Para `[25,50,75,100,3,6]` el popcount es **831 de 899**, que es justo lo que había medido el DP en F1.04. Dos ejecuciones producen **los mismos 113 bytes**, y el bitmap se contrasta **bit a bit** contra `reachableTargets()` en los 899 objetivos.
+**Detalle que parece menor y no lo es: los 5 bits de relleno.** 113 bytes son 904 bits y solo se usan 899. Si el relleno no estuviera siempre a cero, dos bitmaps con el mismo contenido tendrían bytes distintos y **el artefacto de F1.08 dejaría de ser reproducible** — el tipo de fallo que aparece como un `git diff` inexplicable seis meses después. Hay un test dedicado a que `bytes.last & 0xF8 == 0`.
+**Otras decisiones:**
+- Lo que cae fuera de `[101,999]` **se ignora en vez de lanzar**. Un tablero alcanza 18.131 valores y solo 831 son objetivos legales; los demás no son un error de quien llama, son simplemente valores que no sirven de objetivo.
+- `toBytes()` devuelve **copia**. El bitmap es inmutable y nadie de fuera lo altera por descuido; hay un test que lo comprueba escribiendo en el resultado.
+- Un popcount de **cero es legítimo**, no un fallo: es el caso `{1,1,2,2,3,3}` encontrado en F1.04. El test lo fija explícitamente para que nadie lo «arregle» más adelante.
+**Tamaño del artefacto completo:** 13.243 × 113 B = **1.496.459 B ≈ 1,43 MiB**. Entra de sobra en `data/dist/` con LFS y confirma la premisa de `D-02`: el bitmap es embarcable y el producto cartesiano no lo era.
+**Cobertura 100% (269/269)**, 97 tests en el paquete.
 
 **2026-08-19 · F1.04 — CERRADA, con una corrección del criterio.** El DP sobre subconjuntos funciona: para cada máscara de fichas guarda los valores alcanzables usando exactamente esas fichas, partiendo `S = A ⊎ B` y visitando cada partición no ordenada una sola vez (se obliga a que `A` contenga el bit más bajo, y a cambio se prueban los dos sentidos de la resta y la división).
 
