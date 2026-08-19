@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F0.11
+F1.01
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -27,8 +27,8 @@ F0.11
 - [x] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
 - [x] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
 - [x] **F0.10** — **Infraestructura de vectores de conformidad**: `conformance/*.json` con casos dorados, consumidos por los tests de Dart y por los de Deno. → *Un cambio de fórmula en un solo lado rompe el build. Ver `D-08`.* `conformance/`
-- [ ] **F0.11** — Git LFS para `data/dist/`, `.gitignore` para `data/raw/`. → *Un binario de prueba se versiona por LFS.* `.gitattributes`
-- [ ] **F0.12** — **Script `run.ps1`** que cargue las credenciales (URL y `anon` de Supabase vía `--dart-define`) y lance la app en el móvil, en lugar de invocar `flutter run` a pelo. Depende de `F5.01`: no hay app que lanzar antes. → *`./run.ps1` arranca en dispositivo Android con las credenciales inyectadas; el repo no contiene ninguna clave `service_role`.* `run.ps1`
+- [x] **F0.11** — Git LFS para `data/dist/`, `.gitignore` para `data/raw/`. → *Un binario de prueba se versiona por LFS.* `.gitattributes`
+- [!] **F0.12** — *(bloqueada por dependencia: necesita `apps/mobile`, que crea `F5.01`)* **Script `run.ps1`** que cargue las credenciales (URL y `anon` de Supabase vía `--dart-define`) y lance la app en el móvil, en lugar de invocar `flutter run` a pelo. Depende de `F5.01`: no hay app que lanzar antes. → *`./run.ps1` arranca en dispositivo Android con las credenciales inyectadas; el repo no contiene ninguna clave `service_role`.* `run.ps1`
 
 ---
 
@@ -283,6 +283,12 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 **Consecuencia que hay que resolver, y que no es menor:** por `D-10` el reto diario se genera **en cliente de forma determinista**. Con el repositorio público, la semilla y el algoritmo quedan a la vista y cualquiera puede precomputar los retos futuros. Hoy ese código no existe, así que no hay nada expuesto todavía, pero **antes de `F7.01` y `F7.02` hay que decidir cómo se protege la semilla** —no embarcarla en el repositorio, derivarla de un secreto entregado por el servidor, o aceptar explícitamente la exposición apoyándose en que `F7.03` valida el envío al ranking en servidor—. Queda como bloqueo declarado de F7, no como sorpresa.
 **Además:** nada de secretos en el repositorio. La clave `anon` de Supabase es pública por diseño y puede ir en el cliente; la `service_role` y el keystore de `F11.05` **jamás**. Eso ya estaba escrito, pero ahora deja de ser higiene y pasa a ser crítico.
 
+### D-18 — `git-lfs` solo existe en el git de Windows
+**Contexto:** `git-lfs 3.7.1` está instalado en el git de Windows, pero **no en el git de WSL**. Es la misma partición del entorno que ya describió `D-16` para Dart, Flutter y el CLI de Supabase, y tiene una consecuencia peor porque afecta a lo que se guarda en el historial.
+**Riesgo real:** si se hiciera `git add` de un fichero de `data/dist/` desde el git de WSL, el filtro `clean` de LFS no estaría disponible. Git aborta con error en lugar de guardar el binario entero —comprobado que falla ruidosamente, no en silencio—, pero es un obstáculo que aparecerá justo cuando `tools/gen_numbers` (F1.08) genere el primer artefacto de verdad.
+**Decisión:** **toda operación de git que toque `data/dist/` se hace con el git de Windows.** El `lfs install` se aplicó con `--local`, solo a este repositorio, para no modificar la configuración global de la máquina.
+**Verificación de F0.11:** `data/dist/lfs-canary.bin` ocupa 4096 bytes en disco y **129 bytes en el índice**, con el contenido `version https://git-lfs.github.com/spec/v1 / oid sha256:2e34da4f… / size 4096`. En GitHub está almacenado ese mismo puntero, no el binario. `git lfs ls-files` lo lista.
+
 ---
 
 ## INVENTARIO LETRIXA
@@ -322,6 +328,14 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 ---
 
 ## BITÁCORA
+
+**2026-08-19 · F0.11 — CERRADA. Con ella se cierra F0 salvo `F0.12`, bloqueada por dependencia.** `.gitattributes` hace tres cosas y ninguna es decorativa.
+**Primera, `* text=auto eol=lf`.** No estaba en el enunciado de la tarea; lo añadí porque el incidente ya había ocurrido: un editor de Windows reescribió `spanish_words.json` en CRLF y git marcó 131.656 líneas como modificadas sin que cambiara una palabra. Si le pasa a un `.dart`, la puerta `format` del CI falla **en Linux** por algo que en la máquina de quien lo causó se ve perfecto. Comprobado que la normalización no produce ni un cambio espurio en el árbol existente, y que el CI sigue verde (`3e34c70`).
+**Segunda, LFS sobre `data/dist/**`,** deliberadamente amplio en vez de una lista de extensiones. Un formato nuevo entra por LFS sin que nadie tenga que acordarse de añadirlo; un binario colado como fichero normal **no produce ningún error**, y ese es precisamente el fallo silencioso que se quiere evitar. La documentación de la carpeta se exime con `!filter !diff !merge` para que siga leyéndose en GitHub.
+**Tercera, marcar binarios** para que git no les toque los bytes.
+**Criterio verificado en los dos extremos:** `data/dist/lfs-canary.bin` ocupa 4096 bytes en disco y **129 en el índice**, y en GitHub está almacenado el puntero, no el binario. Se conserva como **canario permanente**, con el mismo razonamiento que el de `conformance/`: si algún día ocupa 4096 en el repositorio, LFS ha dejado de aplicarse y el siguiente binario de verdad entraría entero en el historial sin que nadie viera un error.
+**`data/raw/` queda ignorado salvo su README,** que lleva la tabla de procedencia por idioma. Sin esa tabla, `F2.03` —resolver la licencia de los diccionarios— es imposible de cerrar, y en Letrixa no consta ninguna.
+**Hallazgo de entorno, en `D-18`:** `git-lfs` solo está en el git de Windows, no en el de WSL. Misma partición que `D-16`, pero con peor consecuencia porque afecta a lo que se guarda en el historial. `lfs install` se aplicó con `--local`, sin tocar la configuración global de la máquina.
 
 **2026-08-19 · F0.10 — CERRADA** — La red de seguridad de `D-08` existe y **se ha visto fallar**, que es la única prueba que vale. `conformance/canary.json` se ejecuta desde Dart y desde TypeScript, 8 casos en cada lado, y la matriz de divergencia sale exactamente como debe:
 
@@ -410,6 +424,7 @@ La cuarta fila es la que cierra el argumento: el JSON es la autoridad, y cambiar
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
 - **`F0.11` debe incluir `* text=auto eol=lf` en `.gitattributes`, no solo las reglas de LFS.** Ya ha pasado una vez: un editor de Windows reescribió `spanish_words.json` en CRLF y git marcó las 131.656 líneas como modificadas sin que cambiara una sola palabra. Se restauró sin pérdida, pero si le ocurre a un `.dart` la puerta `format` del CI falla en Linux por algo que en local se ve perfecto — el peor tipo de fallo, el que no se reproduce en la máquina de quien lo causó.
 - **`icon.webp` y `spanish_words.json` entraron en el historial de git** en el commit `91f02ab` («first upload»), en la raíz y **sin LFS** (1,8 MB el diccionario). No es grave y no se reescribe historia ya empujada, pero: cuando `F2.01` mueva el diccionario a `data/raw/` —que va ignorado— hay que **dejar de versionar la copia de la raíz**, y `F0.11` debe cubrir `data/dist/` con LFS antes de que aparezca el primer binario generado, que sí será grande.
+- **Vigilar la cuota de LFS de GitHub.** El plan gratuito da 1 GB de almacenamiento y 1 GB/mes de ancho de banda por cuenta, y en un repositorio **público** el ancho de banda que consumen los clones lo paga el propietario. Los artefactos previstos son de pocos MB, pero **cada regeneración añade una versión nueva** al almacenamiento de LFS. Revisar el consumo cuando `F1.08` empiece a producir bitmaps de verdad.
 - **Instalar Deno en la máquina de desarrollo y meter `conformance` dentro de `verify` local.** Hoy `melos run verify` solo cubre la mitad Dart; la mitad TypeScript se verifica en el CI, que es bloqueante, y con `melos run conformance` a mano. Deno hará falta igualmente en `F1.14`. Valorar entonces añadir también `deno fmt --check`, que hoy se deja fuera para no exigir Deno en local.
 - **Acotar el `SUPABASE_ACCESS_TOKEN`.** Hoy es un token de permisos amplios sobre la organización `Manulopsan`, elegido a propósito para dejar de adivinar scopes tras cuatro intentos fallidos. Ahora que el workflow pasa, se puede mirar qué llamadas hace realmente y reducirlo con datos en vez de por suposición.
 - **Quitar `supabase/migrations/.gitkeep` en `F4.01`.** `db push` imprime `Skipping migration .gitkeep...` en cada ejecución. Es inofensivo, pero ese mismo mensaje es el que avisará de una migración mal nombrada, y no conviene que haya uno permanente de fondo con el que confundirlo.
