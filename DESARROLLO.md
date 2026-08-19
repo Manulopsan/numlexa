@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F1.03
+F1.04
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -38,7 +38,7 @@ F1.03
 
 - [x] **F1.01** — Tipos en `numlexa_numbers`: `Tile`, `TileSet`, `Target`, `Expression`, `Solution`, `PuzzleMeta`. → *Sin estados imposibles representables.* `packages/numlexa_numbers/lib/src/types.dart`
 - [x] **F1.02** — `evaluate(expr)`, que devuelve `null` si algún paso intermedio no es entero positivo o si hay división inexacta. → *`100/3` → null · `3-5` → null · `(75+25)*7` → 700.* `packages/numlexa_numbers/lib/src/evaluate.dart`
-- [ ] **F1.03** — Enumerar los multiconjuntos válidos de 6 fichas (0–4 grandes). → *La cuenta coincide con el cálculo combinatorio hecho a mano y documentado en la bitácora.* `packages/numlexa_numbers/lib/src/enumerate.dart`
+- [x] **F1.03** — Enumerar los multiconjuntos válidos de 6 fichas (0–4 grandes). → *La cuenta coincide con el cálculo combinatorio hecho a mano y documentado en la bitácora.* `packages/numlexa_numbers/lib/src/enumerate.dart`
 - [ ] **F1.04** — DP sobre subconjuntos: `reachable(tiles)` recorriendo particiones `S = A ⊎ B`. → *Para `[25,50,75,100,3,6]` contiene 952 y no contiene 1000000.* `packages/numlexa_numbers/lib/src/dp.dart`
 - [ ] **F1.05** — Bitmap de alcanzabilidad: 899 bits por multiconjunto. → *Popcount plausible y estable entre ejecuciones.* `packages/numlexa_numbers/lib/src/bitmap.dart`
 - [ ] **F1.06** — Solver `solve(tiles, target)`: exacta con mínimo de operaciones, o mejor aproximación. → *20 casos conocidos en <200 ms cada uno.* `packages/numlexa_numbers/lib/src/solve.dart`
@@ -328,6 +328,38 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 ---
 
 ## BITÁCORA
+
+**2026-08-19 · F1.03 — CERRADA. Cuenta total: 13.243 multiconjuntos.** El criterio exigía el cálculo combinatorio **a mano** y aquí está, hecho antes de escribir una línea de implementación —de lo contrario sería comprobar el código contra sí mismo—.
+
+**Bolsa pequeña.** Multiconjuntos de tamaño *m* sobre 10 valores con multiplicidad ≤ 2 = coeficiente de *x^m* en `(1+x+x²)¹⁰`. Con *j* = cuántos valores se usan dos veces:
+
+> N(m) = Σ_j C(10, j) · C(10−j, m−2j)
+
+| *m* | desarrollo | N(m) |
+|---|---|---|
+| 2 | 45 + 10 | 55 |
+| 3 | 120 + 90 | 210 |
+| 4 | 210 + 360 + 45 | 615 |
+| 5 | 252 + 840 + 360 | 1.452 |
+| 6 | 210 + 1.260 + 1.260 + 120 | 2.850 |
+
+*Comprobación independiente:* la fila completa de `(1+x+x²)¹⁰` suma **3¹⁰ = 59.049**, y así se verifica en un test.
+
+**Con las grandes**, *k* de 4 distintas → C(4,k), y *m* = 6−*k*:
+
+| *k* grandes | C(4,k) | *m* | N(m) | multiconjuntos |
+|---|---|---|---|---|
+| 0 | 1 | 6 | 2.850 | **2.850** |
+| 1 | 4 | 5 | 1.452 | **5.808** |
+| 2 | 6 | 4 | 615 | **3.690** |
+| 3 | 4 | 3 | 210 | **840** |
+| 4 | 1 | 2 | 55 | **55** |
+| | | | | **13.243** |
+
+**El código coincide fila por fila.** Y no por un solo camino: `enumerateTileSets()` los recorre uno a uno y `countTileSetsByLargeCount()` llega al mismo número por combinatoria pura, sin enumerar. Dos rutas independientes que se delatan mutuamente si una se equivoca. La enumeración completa tarda **125 ms**, así que el generador de F1.08 no tiene ahí ningún cuello de botella.
+**Decisión: el recorrido es determinista.** Mismo orden en cada ejecución, con las bolsas fijadas en orden descendente. Hace falta para que los artefactos de F1.08 sean reproducibles y para que un generador interrumpido pueda reanudar por índice.
+**Dato para F1.09, que ya se ve venir:** el reparto está **muy desequilibrado**. Con 1 ficha grande hay 5.808 multiconjuntos y con 4 solo 55, o sea **105 veces menos**. Como la mezcla es la palanca principal de dificultad (`D-03`), la banda que se apoye en «4 grandes» tendrá un catálogo diminuto comparado con las demás, y eso hay que tenerlo en cuenta al fijar los umbrales.
+**Cobertura 100% (198/198)**, 65 tests en el paquete.
 
 **2026-08-19 · F1.02 — CERRADA** — `evaluate(expression, tiles)` implementado con los tests escritos antes. Los tres casos del criterio pasan: `100/3` → `null`, `3-5` → `null`, `(75+25)*7` → **700**. 52 tests en el paquete, **100% de cobertura (154/154)**.
 **`null` no es un error, es una respuesta.** Está escrito en el propio fichero: el servidor recibe jugadas de clientes y muchas serán inválidas, así que «esta expresión no es una jugada válida» tiene que ser un valor de retorno normal y no una excepción (`CLAUDE.md §6`, régimen B). Es la contrapartida de la excepción deliberada de F1.01, donde `Expression` sí puede representar lo inválido.
