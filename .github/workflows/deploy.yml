@@ -1,0 +1,90 @@
+# Despliegue de Supabase: migraciones y Edge Functions.
+#
+# Por que existe (CLAUDE.md §10, dolor #5): en Letrixa el despliegue es manual
+# y una rama larga acumulo migraciones y funciones que nunca se aplicaron en
+# produccion. El repositorio y lo que corre dejaron de coincidir y nadie se
+# entero hasta el siguiente incidente. Aqui, lo que entra en `main` se aplica.
+#
+# Endurecimientos recomendados cuando haya algo real que desplegar:
+#   - Anadir `environment: production` al job para dejar traza y poder exigir
+#     aprobacion manual antes de tocar la base de datos.
+#   - Anadir `--prune` a `functions deploy` para borrar del proyecto las
+#     funciones que ya no estan en el repositorio. Es destructivo, asi que no
+#     se activa por defecto: se decide cuando exista la primera funcion.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    # Solo se despliega si cambia algo desplegable. Un commit que solo toca
+    # Dart no tiene por que abrir una conexion a produccion.
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+# Nunca se cancela un despliegue a medias: dejaria migraciones aplicadas a
+# medias sin que el workflow lo reporte. Se encolan y van de uno en uno.
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # El ref del proyecto no es un secreto: aparece en la URL publica. Se
+      # deja como variable de repositorio para poder apuntar a otro proyecto
+      # sin tocar el workflow, con el actual como valor por defecto.
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'ggnnesmpuqgjkqarwphm' }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v4
+
+      # Dolor #2: nada falla en silencio. Si faltan los secretos, el workflow
+      # se para aqui diciendo cuales, en vez de reventar mas adelante con un
+      # error de autenticacion que no explica nada.
+      - name: Comprobar que estan los secretos
+        run: |
+          faltan=()
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || faltan+=("SUPABASE_ACCESS_TOKEN")
+          [ -n "$SUPABASE_DB_PASSWORD" ] || faltan+=("SUPABASE_DB_PASSWORD")
+          if [ ${#faltan[@]} -gt 0 ]; then
+            echo "Faltan secretos del repositorio: ${faltan[*]}" >&2
+            echo "Settings -> Secrets and variables -> Actions" >&2
+            exit 1
+          fi
+          echo "Secretos presentes. Proyecto: $SUPABASE_PROJECT_REF"
+
+      - name: Instalar el CLI de Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Enlazar con el proyecto
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
+
+      - name: Aplicar migraciones
+        run: supabase db push -p "$SUPABASE_DB_PASSWORD"
+
+      # `functions deploy` falla si no hay ninguna funcion, y hasta F1.14 no la
+      # habra. Se comprueba antes y se informa, en vez de dejar el workflow en
+      # rojo por algo que es normal en esta fase. Los directorios que empiezan
+      # por `_` no son funciones: son codigo compartido (`_shared/`).
+      - name: Desplegar Edge Functions
+        run: |
+          if find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_*' | grep -q .; then
+            supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
+          else
+            echo "No hay Edge Functions todavia; nada que desplegar."
+          fi

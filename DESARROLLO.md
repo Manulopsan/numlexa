@@ -25,7 +25,7 @@ F0.08
 - [x] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [x] **F0.07** — Script `melos run verify` = analyze + format + test **+ ignores**. → *Un solo comando devuelve 0 con el repo limpio.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [~] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
-- [ ] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
+- [~] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
 - [ ] **F0.10** — **Infraestructura de vectores de conformidad**: `conformance/*.json` con casos dorados, consumidos por los tests de Dart y por los de Deno. → *Un cambio de fórmula en un solo lado rompe el build. Ver `D-08`.* `conformance/`
 - [ ] **F0.11** — Git LFS para `data/dist/`, `.gitignore` para `data/raw/`. → *Un binario de prueba se versiona por LFS.* `.gitattributes`
 - [ ] **F0.12** — **Script `run.ps1`** que cargue las credenciales (URL y `anon` de Supabase vía `--dart-define`) y lance la app en el móvil, en lugar de invocar `flutter run` a pelo. Depende de `F5.01`: no hay app que lanzar antes. → *`./run.ps1` arranca en dispositivo Android con las credenciales inyectadas; el repo no contiene ninguna clave `service_role`.* `run.ps1`
@@ -316,6 +316,16 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F0.09 (en curso)** — Escrito `.github/workflows/deploy.yml`: `supabase link` → `db push` → `functions deploy`, disparado al empujar a `main` **solo si cambia algo desplegable** (`paths: supabase/**`), más ejecución manual. Añadido también `supabase/config.toml` mediante `supabase init`: sin él el CLI no reconoce el directorio como proyecto y ningún paso del workflow podría funcionar.
+**Decisiones que van dentro, y por qué:**
+- `concurrency` con `cancel-in-progress: false`. Un despliegue **no se cancela a medias**: dejaría migraciones aplicadas parcialmente sin que el workflow lo reporte. Se encolan.
+- Un paso previo que **comprueba que los secretos existen y falla diciendo cuáles faltan**, en vez de reventar más adelante con un error de autenticación que no explica nada. Dolor #2 aplicado al CI.
+- El ref del proyecto **no es un secreto** —aparece en la URL pública—, así que va como variable de repositorio con el actual por defecto. Solo `SUPABASE_ACCESS_TOKEN` y `SUPABASE_DB_PASSWORD` son secretos.
+- Guarda antes de `functions deploy`: el comando falla si no hay ninguna función, y hasta `F1.14` no la habrá. Se informa y se sigue, en vez de dejar el workflow en rojo por algo normal en esta fase.
+- **No se activa `--prune`.** Borraría del proyecto las funciones ausentes del repositorio, que es justo la garantía que persigue el dolor #5, pero es destructivo. Se decide cuando exista la primera función real, no antes.
+**Verificado lo verificable:** YAML válido, sintaxis de shell de los pasos correcta, y la guarda de funciones probada en sus cuatro casos —solo `.gitkeep`, solo `_shared/`, con una función real, y limpio de nuevo—; distingue bien `_shared/` de una función, que es exactamente lo que `F1.14` va a crear.
+**Por qué queda `[~]`:** el criterio pide que *un merge a `main` despliegue migraciones y funciones*, y eso no es comprobable sin push ni sin los dos secretos configurados. Mismo bloqueo que `F0.08`, anotado en `BLOQUEOS`.
+
 **2026-08-19 · F0.08 (en curso)** — Escrito `.github/workflows/ci.yml`: `verify` sobre `ubuntu-latest`, disparado en push a `main`, en cada pull request y a mano. SDK de Dart **fijado a 3.10.4**, no `stable`: que el SDK cambie solo es justo la deriva que este proyecto no quiere (`D-16`). Cache de `~/.pub-cache` por hash de `pubspec.lock`, `concurrency` para cancelar ejecuciones superadas, `permissions: contents: read` por mínimo privilegio —los secretos son cosa de `deploy.yml` en `F0.09`— y `timeout-minutes: 20`.
 **Verificado lo verificable:** YAML válido y, desde estado limpio (`.dart_tool` y `coverage` borrados), la secuencia exacta del workflow —`dart pub get` → `dart run melos bootstrap` → `dart run melos run verify`— devuelve **rc=0** en los tres pasos.
 **Por qué queda `[~]` y no `[x]`:** el criterio pide *workflow verde en el primer push* y *bloqueante en PR*, y **ninguna de las dos mitades es verificable desde aquí**. No hay credenciales de GitHub en este entorno (`git ls-remote` falla con «could not read Username») y `gh` no está instalado, así que no puedo pushear ni comprobar que la ejecución sale verde. Y lo de «bloqueante» no es una propiedad del fichero: es la protección de rama de GitHub marcando el check `verify` como requerido, que es una configuración del repositorio, no del repo. Marcarla `[x]` sería exactamente el dolor #5 —dar por terminado algo que no está desplegado—, así que se queda abierta con los dos pasos pendientes anotados en `BLOQUEOS`.
@@ -359,6 +369,8 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 - **`spanish_words.json` aportado en la raíz** (131.655 entradas, lista plana sin frecuencias). Inspección rápida: contiene **nombres propios** (`abraham`, `alemania`, `afganistan`, `alcalá`) y **siglas** (`abs`, `adn`, `adsl`), justo lo que `F2.04` debe filtrar. Además, al no traer rangos de frecuencia, `F2.05` necesitará una lista externa. Moverlo a `data/raw/` en `F2.01`, no antes.
 - **`icon.webp` en la raíz.** Colocarlo en `apps/mobile` cuando exista (`F5.01`/`F5.02`), generar densidades y adaptive icon. No tocar hasta entonces.
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
+- **`deploy.yml`: valorar un `supabase db push --dry-run` en cada PR** que toque `supabase/**`, para ver las migraciones pendientes antes de fusionarlas. Se dejó fuera de `F0.09` por alcance.
+- **`deploy.yml`: decidir `--prune` en `functions deploy` y `environment: production`** cuando exista la primera Edge Function real (`F1.14`). Lo primero garantiza que producción no tenga funciones que ya no están en el repo (dolor #5); lo segundo deja traza y permite exigir aprobación manual antes de tocar la base de datos.
 - **Cerrar el agujero de «sin líneas ejecutables» en `scripts/check_coverage.dart`.** Hoy un paquete sin líneas medibles pasa, que es lo correcto mientras `packages/` esté vacío. En cuanto `F1.01` y `F3.01` metan código real, ese caso debe convertirse en **FALLA**: si no, un fallo de instrumentación de cobertura dejaría el umbral del 90% en verde sin medir nada.
 - **Credenciales:** la clave `anon` de Supabase es pública por diseño y puede viajar en el `run.ps1` y en el binario. La `service_role` **no entra jamás** en el repo, ni en el script, ni en un `--dart-define`; su sitio son los secretos de GitHub Actions (`F0.09`).
 
@@ -369,3 +381,9 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 - **`F0.08` — dos pasos que solo puede dar el usuario.**
   1. **Push.** No hay credenciales de GitHub en el entorno de trabajo (`git ls-remote origin` falla al pedir usuario) ni `gh` instalado. Hace falta `git push -u origin main` para que el workflow se ejecute por primera vez y se pueda comprobar que sale verde.
   2. **Hacerlo bloqueante.** En GitHub: *Settings → Branches → Add branch ruleset* (o *Branch protection rule*) sobre `main`, activando **Require status checks to pass** y marcando el check **`verify`**. El nombre tiene que coincidir con el `name:` del job; si se renombra el job y no se actualiza ahí, el PR deja de estar protegido sin que nadie se entere.
+
+- **`F0.09` — dos secretos que solo puede poner el usuario.** En *Settings → Secrets and variables → Actions*:
+  - `SUPABASE_ACCESS_TOKEN` — token personal del CLI, desde <https://supabase.com/dashboard/account/tokens>.
+  - `SUPABASE_DB_PASSWORD` — contraseña de Postgres del proyecto `ggnnesmpuqgjkqarwphm`.
+
+  Sin ellos el workflow se para en el primer paso diciendo cuál falta, que es el comportamiento buscado. Hasta que no se ejecute una vez de verdad, `F0.09` no se cierra.
