@@ -69,7 +69,13 @@ jobs:
       - name: Instalar el CLI de Supabase
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Version fijada, NO `latest`. Con `latest` la accion consulta la API
+          # de GitHub sin autenticar para resolver la ultima release y se come
+          # el limite de peticiones: `Failed to resolve latest Supabase CLI
+          # release: rate limit exceeded`. Paso en la primera ejecucion de
+          # F0.09. Ademas es coherente con el SDK de Dart de `ci.yml`, que
+          # tambien va fijado por `D-16`: nada de versiones flotantes.
+          version: 2.115.0
 
       - name: Enlazar con el proyecto
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" -p "$SUPABASE_DB_PASSWORD"
