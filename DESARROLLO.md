@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F1.04
+F1.05
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -39,7 +39,7 @@ F1.04
 - [x] **F1.01** — Tipos en `numlexa_numbers`: `Tile`, `TileSet`, `Target`, `Expression`, `Solution`, `PuzzleMeta`. → *Sin estados imposibles representables.* `packages/numlexa_numbers/lib/src/types.dart`
 - [x] **F1.02** — `evaluate(expr)`, que devuelve `null` si algún paso intermedio no es entero positivo o si hay división inexacta. → *`100/3` → null · `3-5` → null · `(75+25)*7` → 700.* `packages/numlexa_numbers/lib/src/evaluate.dart`
 - [x] **F1.03** — Enumerar los multiconjuntos válidos de 6 fichas (0–4 grandes). → *La cuenta coincide con el cálculo combinatorio hecho a mano y documentado en la bitácora.* `packages/numlexa_numbers/lib/src/enumerate.dart`
-- [ ] **F1.04** — DP sobre subconjuntos: `reachable(tiles)` recorriendo particiones `S = A ⊎ B`. → *Para `[25,50,75,100,3,6]` contiene 952 y no contiene 1000000.* `packages/numlexa_numbers/lib/src/dp.dart`
+- [x] **F1.04** — DP sobre subconjuntos: `reachable(tiles)` recorriendo particiones `S = A ⊎ B`. → *Para `[25,50,75,100,3,6]` contiene 952. **Criterio corregido:** también contiene 1000000 —el enunciado original decía lo contrario y era falso—; lo que no contiene es 999999 ni 1000001. Ver bitácora.* `packages/numlexa_numbers/lib/src/dp.dart`
 - [ ] **F1.05** — Bitmap de alcanzabilidad: 899 bits por multiconjunto. → *Popcount plausible y estable entre ejecuciones.* `packages/numlexa_numbers/lib/src/bitmap.dart`
 - [ ] **F1.06** — Solver `solve(tiles, target)`: exacta con mínimo de operaciones, o mejor aproximación. → *20 casos conocidos en <200 ms cada uno.* `packages/numlexa_numbers/lib/src/solve.dart`
 - [ ] **F1.07** — Métricas de dificultad: nº de soluciones, ops mínimas, si exige división intermedia, si exige las 6 fichas. → *`PuzzleMeta` completo para cualquier par alcanzable.* `packages/numlexa_numbers/lib/src/difficulty.dart`
@@ -329,6 +329,31 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F1.04 — CERRADA, con una corrección del criterio.** El DP sobre subconjuntos funciona: para cada máscara de fichas guarda los valores alcanzables usando exactamente esas fichas, partiendo `S = A ⊎ B` y visitando cada partición no ordenada una sola vez (se obliga a que `A` contenga el bit más bajo, y a cambio se prueban los dos sentidos de la resta y la división).
+
+**⚠️ El criterio de aceptación estaba equivocado y se ha corregido.** Decía que `[25,50,75,100,3,6]` **no** alcanza 1.000.000. Sí lo alcanza:
+
+> `(6 / 3) * ((25 + 75) * (50 * 100))` = `2 × (100 × 5000)` = **1.000.000**
+
+No lo di por bueno porque lo dijera mi propio DP —eso sería comprobar el código contra sí mismo—. Escribí un buscador **con otro algoritmo**: recursivo por pares, cogiendo dos valores cualesquiera de una lista y recurriendo con la lista reducida, sin máscaras ni particiones. Encontró la expresión en 101 ms. Y el test la construye como `Expression` y la pasa por `evaluate()` de F1.02, así que el resultado está confirmado por **tres** caminos independientes.
+**Sustituto del test, conservando su intención.** Lo que el criterio quería comprobar es que el DP no se invente valores. Para eso hacen falta valores *de verdad* inalcanzables, así que busqué exhaustivamente con el algoritmo independiente: **999999 y 1000001 no son alcanzables**, y ahora son el test. Dato revelador de por qué el criterio original era ingenuo: **1000003 sí es alcanzable** (`3 + (25*100) * ((75*6) - 50)`). Ese vecindario está lleno de valores alcanzables; elegir 1.000.000 a ojo fue mala suerte.
+**El test que de verdad vale es otro:** el DP se contrasta contra una **fuerza bruta que construye árboles `Expression` reales y los evalúa con `evaluate()`**, en los 56 subconjuntos de hasta cuatro fichas. Coinciden exactamente. Son dos implementaciones que no comparten una línea, así que si coinciden es porque las dos aciertan.
+**El 952 también se exhibe:** `((75 * 3) * (100 + 6) - 50) / 25` = `(23850 - 50) / 25`.
+
+**Mediciones, sobre muestra estratificada de 442 multiconjuntos (1 de cada 30):**
+
+| grandes | objetivos alcanzables de 899 | mínimo | máximo |
+|---|---|---|---|
+| 0 | 672 (75%) | **0** | 899 |
+| 1 | 851 (95%) | 395 | 899 |
+| 2 | 879 (98%) | 785 | 899 |
+| 3 | 838 (93%) | 767 | 897 |
+| 4 | 842 (94%) | 815 | 868 |
+
+**Dos hallazgos que condicionan las fases siguientes:**
+1. **Hay multiconjuntos que no alcanzan NINGÚN objetivo legal.** `{1,1,2,2,3,3}` tiene como producto máximo 36, así que ni un solo valor de `[101,999]` es alcanzable: 62 valores en total y 0 objetivos. En la muestra sale un 0,2%, todos en el grupo sin fichas grandes, que es también el más variable (de 0 a 899). **La garantía de `CLAUDE.md §5` no se sostiene por multiconjunto, sino por par (multiconjunto, objetivo)**, y el pool de F1.11 tiene que excluir estos casos explícitamente. Va a `BACKLOG` como requisito de F1.10 y F1.11.
+2. **El precómputo completo cuesta ~33 s en un solo hilo**, no la hora que presupone `F1.08`. El caso más caro medido —las cuatro grandes con 3 y 6— tarda 59 ms y produce 18.131 valores distintos. Con ese margen, **el requisito de «paralelizado» de F1.08 probablemente sobra**, y una implementación secuencial y simple será más fácil de auditar. Se decide en F1.08 con estos datos delante.
+
 **2026-08-19 · F1.03 — CERRADA. Cuenta total: 13.243 multiconjuntos.** El criterio exigía el cálculo combinatorio **a mano** y aquí está, hecho antes de escribir una línea de implementación —de lo contrario sería comprobar el código contra sí mismo—.
 
 **Bolsa pequeña.** Multiconjuntos de tamaño *m* sobre 10 valores con multiplicidad ≤ 2 = coeficiente de *x^m* en `(1+x+x²)¹⁰`. Con *j* = cuántos valores se usan dos veces:
@@ -473,6 +498,8 @@ La cuarta fila es la que cierra el argumento: el JSON es la autoridad, y cambiar
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
 - **`F0.11` debe incluir `* text=auto eol=lf` en `.gitattributes`, no solo las reglas de LFS.** Ya ha pasado una vez: un editor de Windows reescribió `spanish_words.json` en CRLF y git marcó las 131.656 líneas como modificadas sin que cambiara una sola palabra. Se restauró sin pérdida, pero si le ocurre a un `.dart` la puerta `format` del CI falla en Linux por algo que en local se ve perfecto — el peor tipo de fallo, el que no se reproduce en la máquina de quien lo causó.
 - **`icon.webp` y `spanish_words.json` entraron en el historial de git** en el commit `91f02ab` («first upload»), en la raíz y **sin LFS** (1,8 MB el diccionario). No es grave y no se reescribe historia ya empujada, pero: cuando `F2.01` mueva el diccionario a `data/raw/` —que va ignorado— hay que **dejar de versionar la copia de la raíz**, y `F0.11` debe cubrir `data/dist/` con LFS antes de que aparezca el primer binario generado, que sí será grande.
+- **Excluir del pool los multiconjuntos sin objetivos alcanzables** (`F1.10`, `F1.11`). Medido en F1.04: `{1,1,2,2,3,3}` no alcanza ningún valor de `[101,999]`, y en muestra son ~0,2% del total, todos sin fichas grandes. La garantía de solución exacta es una propiedad del **par** (multiconjunto, objetivo), no del multiconjunto suelto.
+- **Revisar si `F1.08` necesita ser paralelo.** Medición de F1.04: el precómputo entero son ~33 s en un hilo, frente al presupuesto de <60 min de la tarea. Un generador secuencial sería más simple de auditar y reproducir.
 - **`conformance/evaluate.json` y el cargador compartido.** Los vectores del evaluador deben **generarse** desde un `tools/`, no escribirse a mano (`D-08`). Y hay un problema técnico pendiente: el cargador de vectores vive en `packages/numlexa_core/test/conformance/`, y los tests de `numlexa_numbers` no pueden importar el `test/` de otro paquete. Antes de `F1.14` hay que decidir dónde vive el cargador —paquete de desarrollo propio, o `lib/` de `numlexa_core`— en vez de copiarlo, que es como se pudren estas cosas.
 - **Hace falta un renderizador de expresiones para el usuario.** `Expression.toString()` produce `((TileLeaf(0) + TileLeaf(1)) * TileLeaf(2))`, que sirve para depurar pero no para enseñar. Mostrar `((100 + 75) * 4)` exige el `TileSet`, porque las hojas son posiciones, no valores. Corresponde a `F1.06` (solver) o `F5.08` (pantalla de resultado), no a los tipos.
 - **Vigilar la cuota de LFS de GitHub.** El plan gratuito da 1 GB de almacenamiento y 1 GB/mes de ancho de banda por cuenta, y en un repositorio **público** el ancho de banda que consumen los clones lo paga el propietario. Los artefactos previstos son de pocos MB, pero **cada regeneración añade una versión nueva** al almacenamiento de LFS. Revisar el consumo cuando `F1.08` empiece a producir bitmaps de verdad.

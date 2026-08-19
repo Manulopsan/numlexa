@@ -4,6 +4,7 @@
 /// en F1 — evaluacion de expresiones, DP de alcanzabilidad, solver y pool.
 library;
 
+export 'src/dp.dart';
 export 'src/enumerate.dart';
 export 'src/evaluate.dart';
 export 'src/types.dart';
