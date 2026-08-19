@@ -58,6 +58,15 @@ melos:
         encima. CLAUDE.md §7 lo prohibe y no hay lint que lo compruebe.
       run: dart run scripts/check_ignores.dart
 
+    conformance:
+      description: >
+        Mitad TypeScript de los vectores de conformidad (D-08). NO esta dentro
+        de `verify` porque exige Deno instalado, y hoy no lo esta en la maquina
+        de desarrollo. El CI si ejecuta las dos mitades en el job `verify`, que
+        es el check requerido: una divergencia entre Dart y TypeScript rompe el
+        build aunque en local solo se corra la mitad Dart.
+      run: deno test --allow-read supabase/tests/
+
     verify:
       description: >
         La puerta de entrada a cada commit (CLAUDE.md §2, paso 5):

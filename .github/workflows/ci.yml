@@ -68,3 +68,19 @@ jobs:
       # autocontenido y no exige activar Melos globalmente en el runner.
       - name: verify
         run: dart run melos run verify
+
+      # --- Mitad TypeScript de los vectores de conformidad (D-08, F0.10) ---
+      # Va en ESTE job y no en uno aparte a proposito: el check requerido por la
+      # proteccion de rama se llama `verify`, y un job separado no bloquearia el
+      # merge. Una divergencia entre Dart y TypeScript tiene que caerse aqui.
+      - name: Instalar Deno
+        uses: denoland/setup-deno@v2
+        with:
+          # Fijada, como el SDK de Dart y el CLI de Supabase. Ver `D-16`.
+          deno-version: v2.9.5
+
+      - name: Comprobacion de tipos de TypeScript
+        run: deno check supabase/tests/ supabase/functions/
+
+      - name: Conformidad TypeScript
+        run: deno test --allow-read supabase/tests/

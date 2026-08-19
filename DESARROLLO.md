@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F0.10
+F0.11
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -26,7 +26,7 @@ F0.10
 - [x] **F0.07** — Script `melos run verify` = analyze + format + test **+ ignores**. → *Un solo comando devuelve 0 con el repo limpio.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [x] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
 - [x] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
-- [ ] **F0.10** — **Infraestructura de vectores de conformidad**: `conformance/*.json` con casos dorados, consumidos por los tests de Dart y por los de Deno. → *Un cambio de fórmula en un solo lado rompe el build. Ver `D-08`.* `conformance/`
+- [x] **F0.10** — **Infraestructura de vectores de conformidad**: `conformance/*.json` con casos dorados, consumidos por los tests de Dart y por los de Deno. → *Un cambio de fórmula en un solo lado rompe el build. Ver `D-08`.* `conformance/`
 - [ ] **F0.11** — Git LFS para `data/dist/`, `.gitignore` para `data/raw/`. → *Un binario de prueba se versiona por LFS.* `.gitattributes`
 - [ ] **F0.12** — **Script `run.ps1`** que cargue las credenciales (URL y `anon` de Supabase vía `--dart-define`) y lance la app en el móvil, en lugar de invocar `flutter run` a pelo. Depende de `F5.01`: no hay app que lanzar antes. → *`./run.ps1` arranca en dispositivo Android con las credenciales inyectadas; el repo no contiene ninguna clave `service_role`.* `run.ps1`
 
@@ -323,6 +323,25 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 
 ## BITÁCORA
 
+**2026-08-19 · F0.10 — CERRADA** — La red de seguridad de `D-08` existe y **se ha visto fallar**, que es la única prueba que vale. `conformance/canary.json` se ejecuta desde Dart y desde TypeScript, 8 casos en cada lado, y la matriz de divergencia sale exactamente como debe:
+
+| Se toca | Dart | Deno |
+|---|---|---|
+| Nada (sincronizados) | PASA | PASA |
+| Solo la fórmula Dart | **FALLA** | PASA |
+| Solo la fórmula TypeScript | PASA | **FALLA** |
+| Solo el vector dorado | **FALLA** | **FALLA** |
+
+La cuarta fila es la que cierra el argumento: el JSON es la autoridad, y cambiarlo sin tocar ninguna implementación rompe las dos. Eso es justo lo que hace imposible «arreglar» un test editando el vector.
+**El canario no es una regla del juego y está escrito que no lo es.** Es el test de regresión del propio mecanismo, y no se borra nunca: si algún día deja de fallar al desincronizar los lados, la red está rota y nadie se habría enterado. Su contrato imita a propósito la forma de `evaluate()` de `F1.02` —devuelve `null` ante entrada inválida—, así que el formato queda probado con `null` **antes** de que haga falta, en vez de descubrir en F1.02 que el envoltorio no soportaba nulos.
+**Decisiones de diseño que van dentro:**
+- Los dos cargadores son **espejo deliberado**: mismas comprobaciones y mismos mensajes. Un fichero vacío o con `id` repetidos se rechaza en ambos lados, porque un fichero de vectores sin casos pasaría en verde sin comprobar nada — el dolor #2 disfrazado de test que aprueba.
+- Ambos **buscan `conformance/` subiendo por el árbol** en vez de usar rutas relativas del tipo `../../conformance`, que se rompen según desde dónde se lance el test.
+- El lado TypeScript **no tiene dependencias externas**, ni siquiera la librería de asertos: el CI no debe caerse porque un registro de paquetes vaya lento.
+- La implementación TS vive en `supabase/functions/_shared/`, y los tests en `supabase/tests/`. **No es cosmético:** la guarda de `deploy.yml` excluye los directorios que empiezan por `_`, así que un `supabase/functions/tests/` habría intentado desplegarse como si fuera una Edge Function. Verificado que la guarda sigue diciendo «no hay funciones».
+- Las dos mitades corren **en el mismo job `verify` del CI**, no en jobs separados. El check requerido por la protección de rama se llama `verify`; un job aparte no bloquearía el merge y la red de seguridad sería decorativa. Añadido también `deno check` para que un error de tipos de TypeScript caiga igual.
+**Hueco declarado, no escondido:** `melos run verify` en local sigue siendo solo Dart, porque Deno no está instalado en la máquina de desarrollo. La mitad TypeScript se ejecuta con `melos run conformance` y, sobre todo, en el CI, que es bloqueante. En `BACKLOG` queda instalar Deno y plegarlo dentro de `verify` local.
+
 **2026-08-19 · F0.09 — CERRADA** — Despliegue verde de extremo a extremo: `Finished supabase link` → `Connecting to remote database... Remote database is up to date` → `No hay Edge Functions todavia; nada que desplegar`. Los tres pasos hicieron exactamente lo previsto, incluida la guarda de funciones.
 **Costó cinco intentos, y los cuatro fallos merecen quedar escritos porque ninguno era el mismo:**
 1. **No se ejecutó.** GitHub omite los workflows con filtro de rutas cuando el push **crea la rama**. Por eso el primer push disparó CI pero no Deploy. Se lanzó a mano con `workflow_dispatch`.
@@ -391,6 +410,7 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 - **Tensión de marca a cerrar en `F5.02`:** el usuario fija **colores pastel suaves** y `CLAUDE.md §8` fija **tema oscuro por defecto** y tono seco. No son incompatibles —pastel sobre fondo oscuro es una dirección legítima— pero hay que resolverlo explícitamente con el icono delante, no por acumulación de decisiones sueltas. Afecta también a `F11.03` (contraste y modo daltónico).
 - **`F0.11` debe incluir `* text=auto eol=lf` en `.gitattributes`, no solo las reglas de LFS.** Ya ha pasado una vez: un editor de Windows reescribió `spanish_words.json` en CRLF y git marcó las 131.656 líneas como modificadas sin que cambiara una sola palabra. Se restauró sin pérdida, pero si le ocurre a un `.dart` la puerta `format` del CI falla en Linux por algo que en local se ve perfecto — el peor tipo de fallo, el que no se reproduce en la máquina de quien lo causó.
 - **`icon.webp` y `spanish_words.json` entraron en el historial de git** en el commit `91f02ab` («first upload»), en la raíz y **sin LFS** (1,8 MB el diccionario). No es grave y no se reescribe historia ya empujada, pero: cuando `F2.01` mueva el diccionario a `data/raw/` —que va ignorado— hay que **dejar de versionar la copia de la raíz**, y `F0.11` debe cubrir `data/dist/` con LFS antes de que aparezca el primer binario generado, que sí será grande.
+- **Instalar Deno en la máquina de desarrollo y meter `conformance` dentro de `verify` local.** Hoy `melos run verify` solo cubre la mitad Dart; la mitad TypeScript se verifica en el CI, que es bloqueante, y con `melos run conformance` a mano. Deno hará falta igualmente en `F1.14`. Valorar entonces añadir también `deno fmt --check`, que hoy se deja fuera para no exigir Deno en local.
 - **Acotar el `SUPABASE_ACCESS_TOKEN`.** Hoy es un token de permisos amplios sobre la organización `Manulopsan`, elegido a propósito para dejar de adivinar scopes tras cuatro intentos fallidos. Ahora que el workflow pasa, se puede mirar qué llamadas hace realmente y reducirlo con datos en vez de por suposición.
 - **Quitar `supabase/migrations/.gitkeep` en `F4.01`.** `db push` imprime `Skipping migration .gitkeep...` en cada ejecución. Es inofensivo, pero ese mismo mensaje es el que avisará de una migración mal nombrada, y no conviene que haya uno permanente de fondo con el que confundirlo.
 - **Diagnósticos de Supabase: usar el CLI de Windows** (`/mnt/c/Users/manul/scoop/shims/supabase.exe`, 2.65.5), no el del entorno WSL (2.53.6), que tiene una sesión antigua de otra cuenta y devuelve una lista de proyectos engañosa. Costó un diagnóstico erróneo en `F0.09`.

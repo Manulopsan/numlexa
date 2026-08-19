@@ -1,0 +1,16 @@
+{
+  "name": "canary",
+  "version": 1,
+  "description": "Vectores del canario. NO son reglas del juego: existen solo para demostrar que la infraestructura de conformidad funciona de verdad, es decir, que un mismo JSON se ejecuta en Dart y en TypeScript y que una divergencia rompe el build. No se borran nunca: son el test de regresion del propio mecanismo. Los vectores reales llegan en F1.02 (evaluacion de expresiones) y F3.02 (puntuacion).",
+  "function": "canary(a, b)",
+  "contract": "Devuelve a*10 + b cuando a y b son ambos >= 0. Devuelve null si alguno es negativo. La forma imita deliberadamente a evaluate() de F1.02, que tambien devuelve null ante una entrada invalida: asi el formato queda probado con null antes de que haga falta.",
+  "cases": [
+    { "id": "ceros", "input": { "a": 0, "b": 0 }, "expected": 0 },
+    { "id": "basico", "input": { "a": 3, "b": 7 }, "expected": 37 },
+    { "id": "b-de-dos-cifras", "input": { "a": 1, "b": 25 }, "expected": 35 },
+    { "id": "maximo", "input": { "a": 99, "b": 9 }, "expected": 999 },
+    { "id": "a-negativo", "input": { "a": -1, "b": 2 }, "expected": null },
+    { "id": "b-negativo", "input": { "a": 4, "b": -2 }, "expected": null },
+    { "id": "ambos-negativos", "input": { "a": -3, "b": -4 }, "expected": null }
+  ]
+}
