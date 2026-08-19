@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F1.06
+F1.07
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -41,7 +41,7 @@ F1.06
 - [x] **F1.03** — Enumerar los multiconjuntos válidos de 6 fichas (0–4 grandes). → *La cuenta coincide con el cálculo combinatorio hecho a mano y documentado en la bitácora.* `packages/numlexa_numbers/lib/src/enumerate.dart`
 - [x] **F1.04** — DP sobre subconjuntos: `reachable(tiles)` recorriendo particiones `S = A ⊎ B`. → *Para `[25,50,75,100,3,6]` contiene 952. **Criterio corregido:** también contiene 1000000 —el enunciado original decía lo contrario y era falso—; lo que no contiene es 999999 ni 1000001. Ver bitácora.* `packages/numlexa_numbers/lib/src/dp.dart`
 - [x] **F1.05** — Bitmap de alcanzabilidad: 899 bits por multiconjunto. → *Popcount plausible y estable entre ejecuciones.* `packages/numlexa_numbers/lib/src/bitmap.dart`
-- [ ] **F1.06** — Solver `solve(tiles, target)`: exacta con mínimo de operaciones, o mejor aproximación. → *20 casos conocidos en <200 ms cada uno.* `packages/numlexa_numbers/lib/src/solve.dart`
+- [x] **F1.06** — Solver `solve(tiles, target)`: exacta con mínimo de operaciones, o mejor aproximación. → *20 casos conocidos en <200 ms cada uno.* `packages/numlexa_numbers/lib/src/solve.dart`
 - [ ] **F1.07** — Métricas de dificultad: nº de soluciones, ops mínimas, si exige división intermedia, si exige las 6 fichas. → *`PuzzleMeta` completo para cualquier par alcanzable.* `packages/numlexa_numbers/lib/src/difficulty.dart`
 - [ ] **F1.08** — Generador offline paralelizado que vuelca bitmaps y estadísticas por mezcla. → *Termina en <60 min y produce `data/dist/numbers-bitmap.bin`.* `tools/gen_numbers`
 - [ ] **F1.09** — **Analizar estadísticas por nº de fichas grandes (0–4)** y escribir la tabla real en `REGISTRO DE DECISIONES`. → *Datos medidos, no estimados. Punto de parada obligatorio.* `DESARROLLO.md`
@@ -328,6 +328,27 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 ---
 
 ## BITÁCORA
+
+**2026-08-19 · F1.06 — CERRADA. 20 de 20 exactos, peor tiempo 31 ms frente al límite de 200.**
+
+**Observación que simplificó el problema entero:** el número de operaciones **no depende del valor, sino de cuántas fichas se usan**. Una expresión que gasta `k` fichas tiene siempre `k−1` operaciones. Así que «la solución con menos operaciones» es «la que usa menos fichas», y no hay que llevar ninguna contabilidad aparte: sale del popcount de la máscara.
+**No se construyen árboles durante el cálculo.** El DP guarda, por valor, un *paso* compacto —operación y las dos mitades— y se reconstruye **un solo árbol al final**, el de la respuesta. Construir expresiones para los 18.000 valores intermedios y tirar el 99,99% habría sido absurdo.
+
+| caso | obj | ms | ops | solución |
+|---|---|---|---|---|
+| clásico | 952 | 31,0 | 5 | `((((100+3)*6)*75)/50)+25` |
+| tope | 999 | 18,0 | 5 | `(((100/25)+(50*3))*6)+75` |
+| suelo | 101 | 8,1 | 3 | `100+((75-25)/50)` |
+| primo | 997 | 2,4 | 4 | `(((50-1)-9)*25)-3` |
+| redondo | 500 | 3,7 | **1** | `100*5` |
+| dos fichas | 175 | 4,5 | **1** | `100+75` |
+| hostil | 887 | 6,6 | 5 | `((((100-25)*75)-3)/6)-50` |
+
+Se ve que la minimalidad funciona: 500 y 175 se resuelven con **una sola operación** en vez de gastar fichas de más.
+**Los tests no se creen al solver.** Cada resultado se pasa por `evaluate()` de F1.02 —«el solver no puede mentir sobre su propio resultado»— y la minimalidad se contrasta recorriendo `reachableBySubset()` para comprobar que **no existe** ninguna máscara con menos bits que alcance el objetivo. Además hay un barrido de 25 objetivos donde, si el bitmap de F1.05 dice «alcanzable», el solver **tiene** que devolver exacto.
+**La aproximación también se prueba de verdad:** con el tablero yermo `{1,1,2,2,3,3}` y objetivo 500, devuelve el valor más cercano posible en vez de fallar, y con empate en distancia elige el de menos operaciones.
+**El umbral de cobertura encontró código muerto.** Quedaban dos líneas sin ejecutar: un atajo para «exacta con cero operaciones». Es **inalcanzable por construcción** —un objetivo está en `[101,999]` y ninguna ficha pasa de 100, así que una hoja suelta nunca acierta—. Lo borré y dejé el porqué comentado en su sitio. Vuelta al **100% (325/325)**. Van dos veces que la cobertura no sirve para presumir de porcentaje sino para encontrar algo real.
+**No he añadido el renderizador de expresiones** aunque escribí uno para generar la tabla de arriba: `render(expression, tiles)` no lo exige el criterio de F1.06. Sigue en `BACKLOG` para `F5.08`.
 
 **2026-08-19 · F1.05 — CERRADA** — `TargetBitmap`: 899 bits, **113 bytes** por multiconjunto, con el bit `i` correspondiendo al objetivo `101 + i`.
 **Popcount plausible y estable, comprobado con un número exacto y no con una impresión.** Para `[25,50,75,100,3,6]` el popcount es **831 de 899**, que es justo lo que había medido el DP en F1.04. Dos ejecuciones producen **los mismos 113 bytes**, y el bitmap se contrasta **bit a bit** contra `reachableTargets()` en los 899 objetivos.
