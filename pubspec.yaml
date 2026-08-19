@@ -1,0 +1,28 @@
+name: numlexa_workspace
+description: Monorepo de NUMLEXA. Raiz del workspace de pub; no se publica ni se importa.
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+workspace:
+  - packages/numlexa_core
+  - packages/numlexa_numbers
+  - packages/numlexa_letters
+
+dev_dependencies:
+  melos: ^8.3.0
+
+# Configuracion de Melos.
+#
+# OJO: Melos 8 lee su configuracion de ESTE fichero, bajo la clave `melos:`.
+# Un `melos.yaml` en la raiz se ignora en silencio; se comprobo en F0.04.
+# Los paquetes salen de la clave `workspace:` de arriba, no de una lista
+# propia de Melos. `apps/mobile` se anade ahi en F5.01 (solo Android, D-15).
+# Los scripts (`verify` = analyze + format + test) llegan en F0.07.
+melos:
+  ide:
+    intellij:
+      # Melos genera ficheros de IntelliJ por defecto. No se versionan y no
+      # todo el mundo usa ese IDE: se desactivan en vez de ignorarlos.
+      enabled: false

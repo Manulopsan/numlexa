@@ -8,7 +8,7 @@
 ## TAREA ACTUAL
 
 ```
-F0.04
+F0.05
 ```
 
 **Leyenda:** `[ ]` pendiente · `[~]` en curso · `[x]` hecha · `[!]` bloqueada · `[-]` descartada
@@ -20,10 +20,10 @@ F0.04
 - [x] **F0.01** — Auditar Letrixa. → *Hecha. Resultados en `INVENTARIO LETRIXA` y en `D-07`…`D-11`.*
 - [x] **F0.02** — **Decidir el tier de Supabase con `pg_cron` disponible** antes de escribir una sola tarea programada. → *Decisión registrada con el coste mensual. Si no hay pg_cron, se asume conscientemente el patrón de GitHub Actions cron y se documenta por qué.* `DESARROLLO.md`
 - [x] **F0.03** — **Decidir el alcance de iOS.** Letrixa es solo Android y no tiene carpeta `ios/`. Si iOS entra, entra desde F5, no al final. → *Decisión registrada; `F11.05` ajustada en consecuencia.* `DESARROLLO.md`
-- [ ] **F0.04** — Inicializar monorepo con Melos: `packages/` Dart puros + `apps/mobile` + `supabase/`. → *`melos bootstrap` resuelve sin error.* `melos.yaml`
+- [x] **F0.04** — Inicializar monorepo con Melos: `packages/` Dart puros + `apps/mobile` + `supabase/`. → *`melos bootstrap` resuelve sin error.* `pubspec.yaml` *(no `melos.yaml`: ver `D-16`)*
 - [ ] **F0.05** — `analysis_options.yaml` estricto: `strict-casts`, `strict-inference`, sin `print()`, warnings **bloqueantes**. Letrixa usa `flutter_lints` por defecto con warnings no bloqueantes; aquí no. → *Falla ante una violación de prueba.* `analysis_options.yaml`
-- [ ] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `melos.yaml`
-- [ ] **F0.07** — Script `melos run verify` = analyze + format + test. → *Un solo comando devuelve 0 con el repo limpio.* `melos.yaml`
+- [ ] **F0.06** — Tests y cobertura con umbral 90% en `packages/`. → *`melos run test` reporta cobertura por paquete.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
+- [ ] **F0.07** — Script `melos run verify` = analyze + format + test. → *Un solo comando devuelve 0 con el repo limpio.* `pubspec.yaml` *(clave `melos:`, ver `D-16`)*
 - [ ] **F0.08** — **CI que ejecuta `verify` en cada push.** No existe en Letrixa: los 5 workflows actuales son solo cron. → *Workflow verde en el primer push, bloqueante en PR.* `.github/workflows/ci.yml`
 - [ ] **F0.09** — **CI de despliegue**: `supabase db push` y `functions deploy` automatizados. En Letrixa es manual y ya provocó divergencia entre repo y producción (dolor #5). → *Un merge a `main` despliega migraciones y funciones.* `.github/workflows/deploy.yml`
 - [ ] **F0.10** — **Infraestructura de vectores de conformidad**: `conformance/*.json` con casos dorados, consumidos por los tests de Dart y por los de Deno. → *Un cambio de fórmula en un solo lado rompe el build. Ver `D-08`.* `conformance/`
@@ -270,6 +270,12 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 **Efectos sobre el plan:** ajustadas `F5.01` (solo Android), `F10.06` (Android App Links, sin Universal Links), `F11.04` (solo ficha de Play) y `F11.05` (build `.aab` firmado para Play, keystore fuera del repo). `F0.12` (`run.ps1`) ya apuntaba a Android.
 **Condición de revisión:** tracción real en Play Store. Se reabre entonces, con `F12` propia y presupuesto explícito.
 
+### D-16 — Melos 8 se configura en `pubspec.yaml`; toolchain de Windows desde WSL
+**Contexto:** `DESARROLLO.md` daba por supuesto un `melos.yaml`, que es como funcionaba Melos hasta la 6. La versión que resuelve hoy es **Melos 8.3.0**, que se apoya en los **pub workspaces** de Dart 3: los paquetes se declaran en la clave `workspace:` de `pubspec.yaml` y la configuración de Melos vive en ese mismo fichero bajo la clave `melos:`. Comprobado en F0.04: con un `melos.yaml` presente, `ide.intellij.enabled: false` **no surtía efecto**; movido a `pubspec.yaml`, sí. Un `melos.yaml` en la raíz **se ignora en silencio**, que es la peor forma de fallar.
+**Decisión:** no existe `melos.yaml` en este repositorio. Toda la configuración de Melos —paquetes, IDE y los futuros scripts de `F0.07`— vive en `pubspec.yaml`. Corregidas las referencias de fichero de `F0.04`, `F0.06` y `F0.07`.
+**Segunda mitad, sobre el entorno:** la instalación de Flutter y Dart es de **Windows** (`C:\Users\manul\develop\flutter`), no de WSL, y el repositorio vive en una ruta de Windows. Desde WSL el script `bin/dart` falla porque busca un `dart-sdk` de Linux que no existe; hay que invocar **`dart.exe` / `flutter.bat`** por interop. Consecuencias vinculantes: `F0.12` (`run.ps1`) es PowerShell y es el camino natural de ejecución; `F0.08` (CI) corre sobre runners Linux con su propio SDK y por tanto **el CI es la única verificación que no depende de esta particularidad local**, razón de más para que sea bloqueante; y ningún script del repo puede asumir que existe un `dart` en el `PATH` de Linux.
+**Versiones fijadas:** Dart SDK 3.10.4 · Melos 8.3.0 · constraint `sdk: ^3.10.0` en los tres paquetes.
+
 ---
 
 ## INVENTARIO LETRIXA
@@ -309,6 +315,11 @@ Régimen local (un jugador, niveles, diario) validado en cliente y **siempre no 
 ---
 
 ## BITÁCORA
+
+**2026-08-19 · F0.04** — Monorepo inicializado. `melos bootstrap` resuelve sin error con **3 paquetes**: `numlexa_core`, `numlexa_numbers` y `numlexa_letters`, los tres Dart puros, sin Flutter y con `resolution: workspace`. Añadido el esqueleto de `supabase/` (`migrations/`, `functions/`, `tests/`) con un README que deja escritas las dos restricciones que condicionan lo que entre ahí: tier Free sin `pg_cron` en producción (`D-12`) y vectores de conformidad obligatorios (`D-08`). `dart analyze` limpio.
+**Sorpresa, y de las que fallan en silencio:** `melos.yaml` **no funciona** con Melos 8. La configuración va en `pubspec.yaml` bajo la clave `melos:`, y un `melos.yaml` en la raíz se ignora sin avisar — lo detecté porque `ide.intellij.enabled: false` no hacía nada hasta moverlo. Gana el código (`CLAUDE.md §3`): borrado `melos.yaml`, corregidas las referencias de fichero de `F0.04`, `F0.06` y `F0.07`, y registrado en `D-16`.
+**Segunda sorpresa:** Flutter y Dart están instalados **en Windows**, no en WSL, así que desde aquí hay que llamar a `dart.exe` por interop; el `bin/dart` de Linux revienta buscando un `dart-sdk` que no existe. También en `D-16`, porque afecta a `F0.07`, `F0.08` y `F0.12`.
+**Lo que NO he creado, a propósito:** `apps/mobile` no existe todavía. La tarea lo nombra, pero crear una carpeta vacía sería estructura falsa: la app la inicializa `flutter create --platforms=android` en `F5.01`. La clave `workspace:` de `pubspec.yaml` ya tiene comentado dónde se añade. Tampoco se han creado `conformance/`, `tools/` ni `data/`: son de `F0.10`, F1/F2 y `F0.11`. `.gitignore` sí se ha creado, mínimo y solo para artefactos de Dart; las reglas de `data/` y LFS son de `F0.11`.
 
 **2026-08-19 · F0.03** — Alcance de plataformas cerrado: **solo Android** (`D-15`). Sin cuenta de desarrollador de Apple, y no se abre una por especulación: 99 $/año recurrentes frente a los 25 $ de pago único de Play, que además ya está cubierto por Letrixa (confirmar antes de `F11.05`). Decisión deliberada de **no crear la carpeta `ios/`**: una plataforma que nadie compila ni prueba no es una opción abierta, es deuda que se pudre. A cambio se pagan hoy cuatro seguros baratos para que el port no sea imposible más tarde —`packages/` ya es Dart puro y portable, prohibición de dependencias solo-Android sin equivalente, nada de `Platform.isAndroid` disperso por la UI, y `device_id` agnóstico de plataforma—. Si iOS vuelve, vuelve como **fase `F12` propia**, no colado al final de `F11`, que es justo lo que la tarea advertía. Ajustadas en consecuencia `F5.01`, `F10.06`, `F11.04` y `F11.05`. Verificación documental de nuevo: sigue sin existir `melos.yaml` (`F0.04` es la siguiente).
 

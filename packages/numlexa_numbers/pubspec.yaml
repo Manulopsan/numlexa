@@ -1,0 +1,9 @@
+name: numlexa_numbers
+description: Motor de cifras de NUMLEXA - evaluacion, solver y pool. Dart puro, sin Flutter.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace

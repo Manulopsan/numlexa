@@ -1,0 +1,18 @@
+# Artefactos de Dart y Flutter
+.dart_tool/
+.packages
+build/
+coverage/
+pubspec_overrides.yaml
+
+# El pubspec.lock de la raiz del workspace SI se versiona: es el que fija las
+# versiones de todo el monorepo y hace reproducible el CI de F0.08.
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db

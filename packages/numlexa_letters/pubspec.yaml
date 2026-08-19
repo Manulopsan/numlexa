@@ -1,0 +1,9 @@
+name: numlexa_letters
+description: Motor de letras de NUMLEXA - DAWG, anagramas y bolsas. Dart puro, sin Flutter.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace

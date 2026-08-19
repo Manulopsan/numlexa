@@ -1,0 +1,9 @@
+name: numlexa_core
+description: Reglas compartidas de NUMLEXA - puntuacion, maquina de ronda, RNG y calendario. Dart puro, sin Flutter.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace
