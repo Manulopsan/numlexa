@@ -16,3 +16,11 @@ pubspec_overrides.yaml
 # Sistema
 .DS_Store
 Thumbs.db
+
+# --- Datos (F0.11) ---
+# `data/raw/` son diccionarios y listas de frecuencia de terceros: pesados, de
+# licencia por resolver (F2.03) y no redistribuibles sin mas. No se versionan;
+# se documenta de donde salen y como reproducirlos.
+data/raw/*
+!data/raw/README.md
+!data/raw/.gitkeep
